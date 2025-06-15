@@ -21,6 +21,7 @@ env:
   MINIO_HOST: ${{ secrets.MINIO_HOST }}
   MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
   MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+  ELASTIC_KEY: ${{ secrets.ELASTIC_KEY }}
 
 jobs:
   build:
@@ -147,7 +148,7 @@ jobs:
         env:
           EUREKA_URL: ${{ secrets.EUREKA_URL }}
         run: |
-          nohup java -jar api/target/api-${{ steps.extract_version.outputs.version }}.jar \
+          nohup java -DELASTIC_KEY="$ELASTIC_KEY" -jar api/target/api-${{ steps.extract_version.outputs.version }}.jar \
             --server.port=10260 \
             --spring.profiles.active=test \
             --TTB_KEY=$TTB_KEY > app.log 2>&1 &
@@ -172,6 +173,7 @@ jobs:
           -DMINIO_HOST=$MINIO_HOST \
           -DMINIO_ACCESS_KEY=$MINIO_ACCESS_KEY \
           -DMINIO_SECRET_KEY=$MINIO_SECRET_KEY \
+          -DELASTIC_KEY="$ELASTIC_KEY" \
           -B
 
       - name: Print app log if health check fails
@@ -245,5 +247,6 @@ jobs:
             export MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
             export EUREKA_USERNAME=${{ secrets.EUREKA_USER_NAME }}
             export EUREKA_PASSWORD=${{ secrets.EUREKA_USER_PASSWORD }}
+            export ELASTIC_KEY=${{ secrets.ELASTIC_KEY }}
             nohup ./deploy.sh "${{ steps.extract_version.outputs.version }}" > deploy.log 2>&1 &
             exit 0

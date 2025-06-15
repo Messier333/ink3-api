@@ -21,13 +21,4 @@ public class CategoryCouponService {
     public List<CategoryCoupon> getCategoryCouponsWithFetch(Collection<Long> categoryIds) {
         return categoryCouponRepository.findAllByCategoryIdInWithFetch(categoryIds);
     }
-
-    /**
-     * 특정 CategoryCoupon ID 하나만 조회하면서 fetch join
-     */
-    @Transactional(readOnly = true)
-    public CategoryCoupon getCategoryCouponWithFetch(Long id) {
-        return categoryCouponRepository.findByIdWithCategoryAndCoupon(id)
-                .orElseThrow(() -> new EntityNotFoundException("CategoryCoupon not found: " + id));
-    }
 }

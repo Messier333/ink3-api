@@ -52,15 +52,14 @@ public class AladinClientImpl implements AladinClient {
 
             return new AladinBookResponse(
                     item.path("title").asText(),
-                    item.path("description").asText(""),
-                    item.path("toc").asText(""),
-                    item.path("author").asText(null),
-                    item.path("publisher").asText(null),
-                    item.path("pubDate").asText(null),
-                    item.path("isbn13").asText(null),
+                    item.path("description").asText(),
+                    item.path("author").asText(),
+                    item.path("publisher").asText(),
+                    item.path("pubDate").asText(),
+                    item.path("isbn13").asText(),
                     item.path("priceStandard").asInt(),
-                    item.path("cover").asText(null),
-                    item.path("categoryName").asText(null)
+                    item.path("cover").asText(),
+                    item.path("categoryName").asText()
             );
         } catch (AladinBookNotFoundException e) {
             throw e;
@@ -95,15 +94,14 @@ public class AladinClientImpl implements AladinClient {
             for (JsonNode item : items) {
                 books.add(new AladinBookResponse(
                         item.path("title").asText(),
-                        item.path("description").asText(""),
-                        item.path("toc").asText(""),
-                        item.path("author").asText(null),
-                        item.path("publisher").asText(null),
-                        item.path("pubDate").asText(null),
-                        item.path("isbn13").asText(null),
+                        item.path("description").asText(),
+                        item.path("author").asText(),
+                        item.path("publisher").asText(),
+                        item.path("pubDate").asText(),
+                        item.path("isbn13").asText(),
                         item.path("priceStandard").asInt(),
-                        item.path("cover").asText(null).replace("coversum", "cover500"),
-                        item.path("categoryName").asText(null)
+                        item.path("cover").asText().replace("coversum", "cover500"),
+                        item.path("categoryName").asText()
                 ));
             }
             // 알라딘 api에서 가져오는 도서는 200개 제한

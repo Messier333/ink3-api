@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
@@ -58,6 +59,13 @@ public class MeCartController {
     @GetMapping("/coupons")
     public ResponseEntity<CommonResponse<List<CartCouponResponse>>> getCartsWithCoupon(@RequestHeader(name = "X-User-Id") Long userId) {
         List<CartCouponResponse> carts = cartService.getCartItemsWithCoupons(userId);
+        log.warn(carts.toString());
+        return ResponseEntity.ok(CommonResponse.success(carts));
+    }
+
+    @GetMapping("/selected/coupons")
+    public ResponseEntity<CommonResponse<List<CartCouponResponse>>> getSelectCartsWithCoupon(@RequestHeader(name = "X-User-Id") Long userId, @RequestParam(required = false) List<Long> cartIds) {
+        List<CartCouponResponse> carts = cartService.getSelectCartsWithCoupon(userId, cartIds);
         log.warn(carts.toString());
         return ResponseEntity.ok(CommonResponse.success(carts));
     }

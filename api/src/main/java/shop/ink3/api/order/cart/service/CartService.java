@@ -4,15 +4,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import shop.ink3.api.book.book.entity.Book;
+import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
-import shop.ink3.api.book.common.exception.BookNotFoundException;
 import shop.ink3.api.coupon.store.dto.CouponStoreDto;
 import shop.ink3.api.coupon.store.service.CouponStoreService;
 import shop.ink3.api.order.cart.dto.CartCouponResponse;
@@ -39,8 +37,10 @@ public class CartService {
     private final CartRepository cartRepository;
 
     public CartResponse addCartItem(CartRequest request) {
-        User user = userRepository.findById(request.userId()).orElseThrow(() -> new UserNotFoundException(request.userId()));
-        Book book = bookRepository.findById(request.bookId()).orElseThrow(() -> new BookNotFoundException(request.bookId()));
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new UserNotFoundException(request.userId()));
+        Book book = bookRepository.findById(request.bookId())
+                .orElseThrow(() -> new BookNotFoundException(request.bookId()));
 
         Cart cart = cartRepository.findByUserIdAndBookId(user.getId(), book.getId());
 
@@ -48,10 +48,10 @@ public class CartService {
             cart.updateQuantity(cart.getQuantity() + request.quantity());
         } else {
             cart = Cart.builder()
-                .user(user)
-                .book(book)
-                .quantity(request.quantity())
-                .build();
+                    .user(user)
+                    .book(book)
+                    .quantity(request.quantity())
+                    .build();
         }
         Cart savedCart = cartRepository.save(cart);
         CartResponse response = CartResponse.from(savedCart);
@@ -82,8 +82,8 @@ public class CartService {
 
         List<Cart> carts = cartRepository.findByUserId(userId);
         List<CartResponse> responses = carts.stream()
-            .map(CartResponse::from)
-            .toList();
+                .map(CartResponse::from)
+                .toList();
 
         for (int i = 0; i < carts.size(); i++) {
             cacheCart(carts.get(i), responses.get(i));
@@ -96,6 +96,18 @@ public class CartService {
     public List<CartCouponResponse> getCartItemsWithCoupons(Long userId) {
         List<Cart> carts = cartRepository.findByUserId(userId);
 
+        return carts.stream()
+                .map(cart -> {
+                    List<CouponStoreDto> coupons = couponStoreService.getApplicableCouponStores(userId,
+                            cart.getBook().getId());
+                    return CartCouponResponse.from(cart, coupons);
+                })
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CartCouponResponse> getSelectCartsWithCoupon(Long userId, List<Long> cartIds) {
+        List<Cart> carts = cartRepository.findAllByUserIdAndIdIn(userId, cartIds);
         return carts.stream()
             .map(cart -> {
                 List<CouponStoreDto> coupons = couponStoreService.getApplicableCouponStores(userId, cart.getBook().getId());
@@ -138,4 +150,5 @@ public class CartService {
         hashOps().put(key, cart.getId().toString(), response);
         redisTemplate.expire(key, Duration.ofDays(3));
     }
+
 }

@@ -89,6 +89,8 @@ public class MeCouponStoreController {
         return ResponseEntity.ok(CommonResponse.success(responses));
     }
 
+
+
     // ✅ 쿠폰 사용 여부 업데이트
     @PutMapping("/coupon-stores/{storeId}")
     public ResponseEntity<CommonResponse<CouponStoreUpdateResponse>> updateStore(

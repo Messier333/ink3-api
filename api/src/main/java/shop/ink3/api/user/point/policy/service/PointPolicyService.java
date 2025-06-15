@@ -2,13 +2,12 @@ package shop.ink3.api.user.point.policy.service;
 
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.extern.slf4j.Slf4j;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.point.history.entity.PointHistory;
 import shop.ink3.api.user.point.history.service.PointService;
@@ -21,7 +20,6 @@ import shop.ink3.api.user.point.policy.exception.CannotDeleteActivePointPolicyEx
 import shop.ink3.api.user.point.policy.exception.PointPolicyNotFoundException;
 import shop.ink3.api.user.point.policy.repository.PointPolicyRepository;
 import shop.ink3.api.user.user.dto.UserPointRequest;
-import shop.ink3.api.user.user.entity.User;
 
 @Slf4j
 @Transactional
@@ -64,7 +62,8 @@ public class PointPolicyService {
     public PointPolicyResponse updatePointPolicy(long pointPolicyId, PointPolicyUpdateRequest request) {
         PointPolicy pointPolicy = pointPolicyRepository.findById(pointPolicyId)
                 .orElseThrow(() -> new PointPolicyNotFoundException(pointPolicyId));
-        pointPolicy.update(request.name(), request.joinPoint(), request.reviewPoint(), request.imageReviewPoint(), request.defaultRate());
+        pointPolicy.update(request.name(), request.joinPoint(), request.reviewPoint(), request.imageReviewPoint(),
+                request.defaultRate());
         pointPolicyRepository.save(pointPolicy);
         return PointPolicyResponse.from(pointPolicy);
     }
@@ -102,8 +101,8 @@ public class PointPolicyService {
         try {
             PointPolicyResponse response = getPointPolicy(1);
             PointHistory pointHistory = pointService.earnPoint(
-                userId,
-                new UserPointRequest(response.joinPoint(), String.format(POINT_SIGNUP_USER, response.joinPoint()))
+                    userId,
+                    new UserPointRequest(response.joinPoint(), String.format(POINT_SIGNUP_USER, response.joinPoint()))
             );
             log.info("신규 회원 포인트 적립 완료={}", pointHistory.toString());
         } catch (Exception e) {

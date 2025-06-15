@@ -22,8 +22,6 @@ import java.util.List;
 public class CouponStoreController {
 
     private final CouponStoreService couponStoreService;
-    private final BookCouponRepository bookCouponRepository;
-    private final CategoryCouponRepository categoryCouponRepository;
 
     // ✅ 유저의 전체 쿠폰 조회 → /users/{userId}/stores
     @GetMapping("/users/{userId}/coupon-stores")
@@ -73,13 +71,12 @@ public class CouponStoreController {
         return ResponseEntity.ok(CommonResponse.success(null));
     }
 
-    @GetMapping("/applicable-coupons")
-    public ResponseEntity<CommonResponse<List<CouponStoreDto>>> getApplicableCoupons(
+    @GetMapping("/coupon-stores/exists")
+    public ResponseEntity<Boolean> existStoreByOriginId(
             @RequestParam Long userId,
-            @RequestParam Long bookId
-    ) {
-        List<CouponStoreDto> stores = couponStoreService.getApplicableCouponStores(userId, bookId);
-        return ResponseEntity.ok(CommonResponse.success(stores));
+            @RequestParam Long originId) {
+        boolean exists = couponStoreService.existByOriginIdAndUserId(userId, originId);
+        return ResponseEntity.ok(exists);
     }
 }
 

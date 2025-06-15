@@ -13,6 +13,7 @@ public record CouponResponse(
         int discountValue,
         LocalDateTime issuableFrom,
         LocalDateTime expiresAt,
+        boolean isActive,
         LocalDateTime createdAt,
         List<BookInfo> books,
         List<CategoryInfo> categories
@@ -29,6 +30,7 @@ public record CouponResponse(
                 coupon.getCouponPolicy().getDiscountValue(),
                 coupon.getIssuableFrom(),
                 coupon.getExpiresAt(),
+                coupon.isActive(),
                 coupon.getCreatedAt(),
                 books == null ? List.of() : books,
                 categories == null ? List.of() : categories

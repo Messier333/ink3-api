@@ -1,6 +1,5 @@
 package shop.ink3.api.book.book.entity;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,26 +10,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import shop.ink3.api.book.author.entity.Author;
-import shop.ink3.api.book.bookAuthor.entity.BookAuthor;
-import shop.ink3.api.book.bookCategory.entity.BookCategory;
-import shop.ink3.api.book.bookTag.entity.BookTag;
-import shop.ink3.api.book.category.entity.Category;
 import shop.ink3.api.book.publisher.entity.Publisher;
-import shop.ink3.api.book.tag.entity.Tag;
 
 @Builder
 @Entity
@@ -69,69 +56,39 @@ public class Book {
     private Integer salePrice;
 
     @Column(nullable = false)
-    private Integer discountRate;
-
-    @Column(nullable = false)
     private Integer quantity;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private BookStatus status;
 
     @Column(nullable = false)
     private boolean isPackable;
 
     @Column(nullable = false)
+    private Long totalRating;
+
+    @Column(nullable = false)
+    private Long reviewCount;
+
+    @Column(nullable = false)
+    private Long likeCount;
+
+    @Column(nullable = false)
     private String thumbnailUrl;
 
-    @Builder.Default
-    @OneToMany(mappedBy = "book",
-        cascade = CascadeType.ALL,
-        orphanRemoval = true)
-    private List<BookCategory> bookCategories = new ArrayList<>();
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private BookStatus status;
 
-    @Builder.Default
-    @OneToMany(mappedBy = "book",
-        cascade = CascadeType.ALL,
-        orphanRemoval = true)
-    private List<BookAuthor> bookAuthors = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "book",
-        cascade = CascadeType.ALL,
-        orphanRemoval = true)
-    private List<BookTag> bookTags = new ArrayList<>();
-
-    @PrePersist
-    @PreUpdate
-    public void updateDiscountRate() {
-        if (originalPrice != 0) {
-            this.discountRate = (originalPrice - salePrice) * 100 / originalPrice;
-        } else {
-            this.discountRate = 0;
+    public int getDiscountRate() {
+        if (originalPrice <= 0 || salePrice >= originalPrice) {
+            return 0;
         }
+        return (int) Math.floor(100.0 * (originalPrice - salePrice) / originalPrice);
     }
 
-    public void addBookCategory(Category category) {
-        BookCategory bookCategory = new BookCategory(this, category);
-        this.bookCategories.add(bookCategory);
-        category.addBookCategory(bookCategory);
-    }
-
-    public void addBookAuthor(Author author, String role) {
-        BookAuthor bookAuthor = new BookAuthor(this, author, role);
-        this.bookAuthors.add(bookAuthor);
-        author.addBookAuthor(bookAuthor);
-    }
-
-    public void addBookTag(Tag tag) {
-        BookTag bookTag = new BookTag(this, tag);
-        this.bookTags.add(bookTag);
-        tag.addBookTag(bookTag);
-    }
-
-    public void deleteBook(){
-        this.status = BookStatus.DELETED;
+    public Double getAverageRating() {
+        if (reviewCount == 0) {
+            return 0.0;
+        }
+        return totalRating / (double) reviewCount;
     }
 
     public void updateBook(
@@ -162,6 +119,25 @@ public class Book {
         this.publisher = publisher;
     }
 
+    public void addRating(int rating) {
+        this.totalRating += rating;
+        this.reviewCount++;
+    }
+
+    public void updateRating(int oldRating, int newRating) {
+        this.totalRating = this.totalRating - oldRating + newRating;
+    }
+
+    public void incrementLikeCount() {
+        this.likeCount = (this.likeCount == null) ? 1 : this.likeCount + 1;
+    }
+
+    public void decrementLikeCount() {
+        if (this.likeCount != null && this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
+
     // 주문 시 재고 확인 및 재고 수량 감소
     public void decreaseQuantity(int amount) {
         if (this.quantity < amount) {
@@ -173,5 +149,9 @@ public class Book {
     // 반품 시 재고 수량 증가
     public void increaseQuantity(int amount) {
         this.quantity += amount;
+    }
+
+    public void delete() {
+        this.status = BookStatus.DELETED;
     }
 }

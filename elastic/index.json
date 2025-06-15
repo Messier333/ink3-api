@@ -1,0 +1,65 @@
+//PUT /ink3_books_dev
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "long"
+      },
+      "isbn": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "nori"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "nori"
+      },
+      "authors": {
+        "type": "text",
+        "analyzer": "nori"
+      },
+      "publisher": {
+        "type": "text",
+        "analyzer": "nori"
+      },
+      "publishedAt": {
+        "type": "date"
+      },
+      "categories": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "text",
+        "analyzer": "nori",
+        "fields": {
+          "raw": {
+            "type": "keyword"
+          }
+        }
+      },
+      "price": {
+        "type": "integer"
+      },
+      "rating": {
+        "type": "float"
+      },
+      "ratingCount": {
+        "type": "integer"
+      },
+      "reviewCount": {
+        "type": "integer"
+      },
+      "viewCount": {
+        "type": "integer"
+      },
+      "searchCount": {
+        "type": "integer"
+      },
+      "popularityScore": {
+        "type": "integer"
+      }
+    }
+  }
+}

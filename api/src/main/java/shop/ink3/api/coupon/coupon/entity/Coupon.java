@@ -3,8 +3,6 @@ package shop.ink3.api.coupon.coupon.entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -48,10 +46,13 @@ public class Coupon {
 
     private LocalDateTime issuableFrom;
 
+    private boolean isActive;
+
     @Setter
     private LocalDateTime expiresAt;
 
     private LocalDateTime createdAt;
+
 
     @Builder.Default
     @OneToMany(mappedBy = "coupon", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -81,6 +82,7 @@ public class Coupon {
             String newName,
             LocalDateTime newIssuableFrom,
             LocalDateTime newExpiresAt,
+            boolean isActive,
             LocalDateTime newCreatedAt,
             List<Book> newBookList,
             List<Category> newCategoryList
@@ -90,6 +92,7 @@ public class Coupon {
         this.name = newName;
         this.issuableFrom = newIssuableFrom;
         this.expiresAt = newExpiresAt;
+        this.isActive = isActive;
         this.createdAt = newCreatedAt;
 
         // 2) BookCoupon 관계 리셋

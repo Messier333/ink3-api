@@ -15,9 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.repository.BookRepository;
-import shop.ink3.api.book.category.entity.Category;
+import shop.ink3.api.book.bookCategory.entity.BookCategory;
+import shop.ink3.api.book.bookCategory.repository.BookCategoryRepository;
 import shop.ink3.api.book.category.repository.CategoryRepository;
+import shop.ink3.api.book.category.service.CategoryService;
 import shop.ink3.api.coupon.bookCoupon.entity.BookCouponRepository;
+import shop.ink3.api.coupon.categoryCoupon.entity.CategoryCoupon;
 import shop.ink3.api.coupon.categoryCoupon.entity.CategoryCouponService;
 import shop.ink3.api.coupon.coupon.entity.Coupon;
 import shop.ink3.api.coupon.coupon.exception.CouponNotFoundException;
@@ -48,6 +51,8 @@ public class CouponStoreService {
     private final CouponStoreRepository couponStoreRepository;
     private final BookRepository bookRepository;
     private final CategoryRepository categoryRepository;
+    private final BookCategoryRepository bookCategoryRepository;
+    private final CategoryService categoryService;
 
     /**
      * 1) 쿠폰 발급
@@ -173,6 +178,19 @@ public class CouponStoreService {
         return store; // 트랜잭션 커밋 시점에 자동으로 반영
     }
 
+    @Transactional
+    public void disableCouponStoresByCouponId(Long couponId) {
+        // 1) READY 상태의 모든 스토어 조회
+        List<CouponStore> stores = couponStoreRepository
+                .findAllByCouponIdAndStatus(couponId, CouponStatus.READY);
+
+        // 2) 각각 DISABLED 로 업데이트
+        stores.forEach(store -> store.update(CouponStatus.DISABLED, null));
+
+        // → 여기에 빠져 있었던 저장 호출을 추가해야 합니다.
+        couponStoreRepository.saveAll(stores);
+    }
+
     /**
      * 6) 삭제
      */
@@ -187,6 +205,12 @@ public class CouponStoreService {
     }
 
     @Transactional(readOnly = true)
+    public boolean existByOriginIdAndUserId(Long userId, Long originId) {
+        return couponStoreRepository.existsByOriginIdAndUserId(userId, originId);
+    }
+
+
+    @Transactional(readOnly = true)
     public List<CouponStoreDto> getApplicableCouponStores(Long userId, Long bookId) {
         // 1) BOOK 기반 쿠폰
         List<Long> bookCouponIds = bookCouponRepository.findIdsByBookId(bookId);
@@ -199,24 +223,21 @@ public class CouponStoreService {
                 .orElseThrow(() -> new EntityNotFoundException("Book not found: " + bookId));
 
         // 직접 매핑된 카테고리 ID들
-        List<Long> directCategoryIds = book.getBookCategories().stream()
-                .map(bc -> bc.getCategory().getId())
+        List<Long> directCategoryIds = bookCategoryRepository.findAllByBookId(bookId).stream()
+                .map(BookCategory::getId)
                 .toList();
 
         // 조상 카테고리 포함해서 ID 수집
         Set<Long> allCategoryIds = new HashSet<>(directCategoryIds);
         for (Long catId : directCategoryIds) {
-            List<Category> ancestors = categoryRepository.findAllAncestors(catId);
-            for (Category parent : ancestors) {
-                allCategoryIds.add(parent.getId());
-            }
+            categoryService.getAllAncestors(catId).forEach(c -> allCategoryIds.add(c.id()));
         }
 
         // CategoryCoupon 엔티티를 fetch join 으로 가져오고 → ID만 뽑아 내기
         List<Long> categoryCouponIds = categoryCouponService
                 .getCategoryCouponsWithFetch(allCategoryIds)
                 .stream()
-                .map(cc -> cc.getId())
+                .map(CategoryCoupon::getId)
                 .toList();
 
         List<CouponStore> categoryStores = couponStoreRepository

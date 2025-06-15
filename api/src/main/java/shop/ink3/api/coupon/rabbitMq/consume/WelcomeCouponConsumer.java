@@ -34,7 +34,7 @@ public class WelcomeCouponConsumer {
     public void consumeWelcome(WelcomeCouponMessage message) {
         try{
             System.out.println(message.userId());
-            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(1L, "WELCOME", LocalDateTime.now(), LocalDateTime.now().plusDays(30), Collections.emptyList(), Collections.emptyList());
+            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(1L, "WELCOME", LocalDateTime.now(), LocalDateTime.now().plusDays(30), true,Collections.emptyList(), Collections.emptyList());
             CouponResponse coupon = couponService.createCoupon(couponCreateRequest);
             Long couponId = coupon.couponId();
 

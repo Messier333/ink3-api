@@ -10,9 +10,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.category.entity.Category;
 
@@ -20,13 +20,14 @@ import shop.ink3.api.book.category.entity.Category;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Getter
+@Builder
 @Table(name = "book_categories")
 public class BookCategory {
-
     public BookCategory(Book book, Category category) {
         this.book = book;
         this.category = category;
     }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,8 +39,4 @@ public class BookCategory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
-
-    public BookCategory(Category bc1) {
-        this.category = bc1;
-    }
 }

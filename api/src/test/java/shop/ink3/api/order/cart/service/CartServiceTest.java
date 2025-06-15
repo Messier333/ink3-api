@@ -1,14 +1,17 @@
 package shop.ink3.api.order.cart.service;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +22,6 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
-
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.entity.BookStatus;
 import shop.ink3.api.book.book.repository.BookRepository;
@@ -66,56 +68,54 @@ class CartServiceTest {
         when(redisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
 
         user = User.builder()
-            .id(1L)
-            .loginId("test")
-            .name("test")
-            .email("test@test.com")
-            .phone("010-1234-5678")
-            .birthday(LocalDate.of(2025, 1, 1))
-            .point(1000)
-            .status(UserStatus.ACTIVE)
-            .lastLoginAt(LocalDateTime.now())
-            .createdAt(LocalDateTime.now())
-            .build();
+                .id(1L)
+                .loginId("test")
+                .name("test")
+                .email("test@test.com")
+                .phone("010-1234-5678")
+                .birthday(LocalDate.of(2025, 1, 1))
+                .point(1000)
+                .status(UserStatus.ACTIVE)
+                .lastLoginAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .build();
 
         publisher = Publisher.builder()
-            .id(1L)
-            .name("출판사1")
-            .build();
+                .id(1L)
+                .name("출판사1")
+                .build();
 
         book1 = Book.builder()
-            .id(1L)
-            .isbn("1234567890123")
-            .title("예제 책 제목")
-            .contents("책 내용 요약")
-            .description("책 상세 설명")
-            .publishedAt(LocalDate.of(2024, 1, 1))
-            .originalPrice(20000)
-            .salePrice(18000)
-            .discountRate((18000 * 100) / 20000)
-            .quantity(100)
-            .status(BookStatus.AVAILABLE)
-            .isPackable(true)
-            .thumbnailUrl("https://example.com/image.jpg")
-            .publisher(publisher)
-            .build();
+                .id(1L)
+                .isbn("1234567890123")
+                .title("예제 책 제목")
+                .contents("책 내용 요약")
+                .description("책 상세 설명")
+                .publishedAt(LocalDate.of(2024, 1, 1))
+                .originalPrice(20000)
+                .salePrice(18000)
+                .quantity(100)
+                .status(BookStatus.AVAILABLE)
+                .isPackable(true)
+                .thumbnailUrl("https://example.com/image.jpg")
+                .publisher(publisher)
+                .build();
 
         book2 = Book.builder()
-            .id(2L)
-            .isbn("1234567890124")
-            .title("예제 책 제목")
-            .contents("책 내용 요약")
-            .description("책 상세 설명")
-            .publishedAt(LocalDate.of(2024, 1, 1))
-            .originalPrice(20000)
-            .salePrice(18000)
-            .discountRate((18000 * 100) / 20000)
-            .quantity(100)
-            .status(BookStatus.AVAILABLE)
-            .isPackable(true)
-            .thumbnailUrl("https://example.com/image.jpg")
-            .publisher(publisher)
-            .build();
+                .id(2L)
+                .isbn("1234567890124")
+                .title("예제 책 제목")
+                .contents("책 내용 요약")
+                .description("책 상세 설명")
+                .publishedAt(LocalDate.of(2024, 1, 1))
+                .originalPrice(20000)
+                .salePrice(18000)
+                .quantity(100)
+                .status(BookStatus.AVAILABLE)
+                .isPackable(true)
+                .thumbnailUrl("https://example.com/image.jpg")
+                .publisher(publisher)
+                .build();
 
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(bookRepository.findById(book1.getId())).thenReturn(Optional.of(book1));
@@ -127,10 +127,10 @@ class CartServiceTest {
     void addCartItem() {
         CartRequest cartRequest = new CartRequest(user.getId(), book1.getId(), 100);
         Cart cart = Cart.builder()
-            .user(user)
-            .book(book1)
-            .quantity(cartRequest.quantity())
-            .build();
+                .user(user)
+                .book(book1)
+                .quantity(cartRequest.quantity())
+                .build();
 
         ReflectionTestUtils.setField(cart, "id", 1L);
 
@@ -150,10 +150,10 @@ class CartServiceTest {
     void updateCartQuantity() {
         CartRequest cartRequest = new CartRequest(user.getId(), book1.getId(), 100);
         Cart cart = Cart.builder()
-            .user(user)
-            .book(book1)
-            .quantity(cartRequest.quantity())
-            .build();
+                .user(user)
+                .book(book1)
+                .quantity(cartRequest.quantity())
+                .build();
 
         ReflectionTestUtils.setField(cart, "id", 1L);
 
@@ -174,17 +174,17 @@ class CartServiceTest {
     void getCartItemsByUserId() {
         List<Cart> carts = new ArrayList<>();
         Cart cart1 = Cart.builder()
-            .user(user)
-            .book(book1)
-            .quantity(100)
-            .build();
+                .user(user)
+                .book(book1)
+                .quantity(100)
+                .build();
         ReflectionTestUtils.setField(cart1, "id", 1L);
 
         Cart cart2 = Cart.builder()
-            .user(user)
-            .book(book2)
-            .quantity(100)
-            .build();
+                .user(user)
+                .book(book2)
+                .quantity(100)
+                .build();
         ReflectionTestUtils.setField(cart2, "id", 2L);
 
         carts.add(cart1);
@@ -204,7 +204,7 @@ class CartServiceTest {
     void getCartItemsByUserIdWithRedis() {
         String key = "cart:user:1";
         CartResponse cachedCart = CartResponse.from(
-            Cart.builder().id(1L).user(user).book(book1).quantity(1).build()
+                Cart.builder().id(1L).user(user).book(book1).quantity(1).build()
         );
 
         when(hashOperations.values(key)).thenReturn(List.of(cachedCart));
@@ -234,18 +234,18 @@ class CartServiceTest {
         when(cartRepository.findById(0L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> cartService.deleteCartItems(0L))
-            .isInstanceOf(UserNotFoundException.class)
-            .hasMessageContaining("User not found. ID: ");
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessageContaining("User not found. ID: ");
     }
 
     @Test
     @DisplayName("장바구니 선택 삭제 성공")
     void deleteCartItemSuccess() {
         Cart cart = Cart.builder()
-            .user(user)
-            .book(book1)
-            .quantity(100)
-            .build();
+                .user(user)
+                .book(book1)
+                .quantity(100)
+                .build();
 
         when(cartRepository.findById(1L)).thenReturn(Optional.of(cart));
 
@@ -258,7 +258,7 @@ class CartServiceTest {
         when(cartRepository.findById(0L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> cartService.deleteCartItem(0L))
-            .isInstanceOf(CartNotFoundException.class)
-            .hasMessageContaining("존재하지 않는 장바구니입니다 id: ");
+                .isInstanceOf(CartNotFoundException.class)
+                .hasMessageContaining("존재하지 않는 장바구니입니다 id: ");
     }
 }

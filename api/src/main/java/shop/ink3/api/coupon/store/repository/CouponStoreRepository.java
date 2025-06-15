@@ -22,7 +22,8 @@ public interface CouponStoreRepository extends JpaRepository<CouponStore, Long>,
 
     @EntityGraph(attributePaths = {"coupon", "user"})
     List<CouponStore> findByUserIdAndStatus(Long userId, CouponStatus status);
-
+    @EntityGraph(attributePaths = {"coupon"})
+    List<CouponStore> findAllByCouponIdAndStatus(Long couponId, CouponStatus status);
     boolean existsByUserIdAndOriginType(Long userId, OriginType originType);
 
     boolean existsByUserIdAndCouponIdAndOriginTypeAndOriginId(Long userId, Long couponId, OriginType originType,
@@ -57,5 +58,10 @@ public interface CouponStoreRepository extends JpaRepository<CouponStore, Long>,
             @Param("status") CouponStatus status
     );
 
+
     boolean existsByCouponId(Long couponId);
+
+    boolean existsByOriginIdAndUserId(Long originId, Long userId);
+
+    boolean existsByStatusAndUserIdAndOriginType(CouponStatus status, Long userId, OriginType originType);
 }
