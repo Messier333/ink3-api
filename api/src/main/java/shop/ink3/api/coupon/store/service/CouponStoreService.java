@@ -191,6 +191,13 @@ public class CouponStoreService {
         couponStoreRepository.saveAll(stores);
     }
 
+    @Transactional
+    public void reactivateCouponStoresByCouponId(Long couponId) {
+        List<CouponStore> stores = couponStoreRepository.findAllByCouponIdAndStatus(couponId, CouponStatus.DISABLED);
+        stores.forEach(store -> store.update(CouponStatus.READY, null));
+        couponStoreRepository.saveAll(stores);
+    }
+
     /**
      * 6) 삭제
      */
