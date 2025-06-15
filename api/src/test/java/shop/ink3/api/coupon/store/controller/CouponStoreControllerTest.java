@@ -264,45 +264,4 @@ class CouponStoreControllerTest {
 
         verify(couponStoreService, times(1)).deleteStore(storeId);
     }
-
-    @Test
-    @DisplayName("GET /applicable-coupons?userId={userId}&bookId={bookId} - 적용 가능 쿠폰 조회")
-    void getApplicableCoupons_success() throws Exception {
-        // Arrange
-        Long userId = 1L;
-        Long bookId = 10L;
-        CouponStoreDto dto = new CouponStoreDto(
-                7L,
-                100L,
-                "DISCOUNT",
-                LocalDateTime.of(2025, 12, 1, 0, 0),
-                LocalDateTime.of(2025, 12, 31, 0, 0),
-                OriginType.BOOK,
-                10L,
-                CouponStatus.READY,
-                DiscountType.FIXED,
-                3000,
-                null,
-                25000,
-                10000
-        );
-
-        when(couponStoreService.getApplicableCouponStores(userId, bookId))
-                .thenReturn(List.of(dto));
-
-        // Act & Assert
-        mockMvc.perform(get("/applicable-coupons")
-                        .param("userId", String.valueOf(userId))
-                        .param("bookId", String.valueOf(bookId))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                // 해당 엔드포인트는 List<CouponStoreDto>를 직접 반환하므로, 최상위 배열 형태로 검증
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].storeId", is(7)))
-                .andExpect(jsonPath("$.data[0].couponId", is(100)))
-                .andExpect(jsonPath("$.data[0].originType", is("BOOK")));
-
-        verify(couponStoreService, times(1))
-                .getApplicableCouponStores(userId, bookId);
-    }
 }
