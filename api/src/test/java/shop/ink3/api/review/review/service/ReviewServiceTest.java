@@ -24,6 +24,7 @@ import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.common.uploader.MinioService;
+import shop.ink3.api.elastic.service.BookSearchService;
 import shop.ink3.api.order.order.entity.Order;
 import shop.ink3.api.order.orderBook.entity.OrderBook;
 import shop.ink3.api.order.orderBook.repository.OrderBookRepository;
@@ -73,6 +74,9 @@ class ReviewServiceTest {
 
     @InjectMocks
     private ReviewService reviewService;
+
+    @Mock
+    private BookSearchService bookSearchService;
 
     private User user;
     private Order order;
