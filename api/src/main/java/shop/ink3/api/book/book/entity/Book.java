@@ -134,6 +134,10 @@ public class Book {
         this.reviewCount = reviewCount;
     }
 
+    public void updateTotalRating(Long totalRating) {
+        this.totalRating = totalRating;
+    }
+
     public void incrementLikeCount() {
         this.likeCount = (this.likeCount == null) ? 1 : this.likeCount + 1;
     }

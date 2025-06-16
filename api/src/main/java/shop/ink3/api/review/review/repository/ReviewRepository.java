@@ -57,13 +57,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByOrderBookId(Long orderBookId);
 
-    @Query("""
-            SELECT AVG(r.rating)
-            FROM Review r
-            JOIN r.orderBook ob
-            WHERE ob.book.id = :bookId
-        """)
-    Optional<Double> findAverageRatingByBookId(@Param("bookId") Long bookId);
-
-    Long countByOrderBookBookId(Long bookId);
+    @Query("SELECT COALESCE(SUM(r.rating), 0) FROM Review r WHERE r.orderBook.book.id = :bookId")
+    Long sumRatingByBookId(@Param("bookId") Long bookId);
 }
