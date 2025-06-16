@@ -10,6 +10,7 @@ import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.like.dto.LikeCreateRequest;
+import shop.ink3.api.user.like.dto.LikeExistResponse;
 import shop.ink3.api.user.like.dto.LikeResponse;
 import shop.ink3.api.user.like.entity.Like;
 import shop.ink3.api.user.like.exception.LikeAlreadyExistsException;
@@ -34,6 +35,11 @@ public class LikeService {
         }
         Page<Like> likes = likeRepository.findAllByUserId(userId, pageable);
         return PageResponse.from(likes.map(like -> LikeResponse.from(userId, like)));
+    }
+
+    @Transactional(readOnly = true)
+    public LikeExistResponse hasUserLikedBook(long userId, long bookId) {
+        return new LikeExistResponse(likeRepository.existsByUserIdAndBookId(userId, bookId));
     }
 
     public LikeResponse createLike(long userId, LikeCreateRequest request) {
