@@ -20,6 +20,7 @@ import shop.ink3.api.book.bookCategory.repository.BookCategoryRepository;
 import shop.ink3.api.book.category.repository.CategoryRepository;
 import shop.ink3.api.book.category.service.CategoryService;
 import shop.ink3.api.coupon.bookCoupon.entity.BookCouponRepository;
+import shop.ink3.api.coupon.categoryCoupon.entity.CategoryCoupon;
 import shop.ink3.api.coupon.categoryCoupon.entity.CategoryCouponService;
 import shop.ink3.api.coupon.coupon.entity.Coupon;
 import shop.ink3.api.coupon.coupon.exception.CouponNotFoundException;
@@ -177,6 +178,19 @@ public class CouponStoreService {
         return store; // 트랜잭션 커밋 시점에 자동으로 반영
     }
 
+    @Transactional
+    public void disableCouponStoresByCouponId(Long couponId) {
+        // 1) READY 상태의 모든 스토어 조회
+        List<CouponStore> stores = couponStoreRepository
+                .findAllByCouponIdAndStatus(couponId, CouponStatus.READY);
+
+        // 2) 각각 DISABLED 로 업데이트
+        stores.forEach(store -> store.update(CouponStatus.DISABLED, null));
+
+        // → 여기에 빠져 있었던 저장 호출을 추가해야 합니다.
+        couponStoreRepository.saveAll(stores);
+    }
+
     /**
      * 6) 삭제
      */
@@ -210,7 +224,7 @@ public class CouponStoreService {
 
         // 직접 매핑된 카테고리 ID들
         List<Long> directCategoryIds = bookCategoryRepository.findAllByBookId(bookId).stream()
-                .map(BookCategory::getId)
+                .map(bookCategory -> bookCategory.getCategory().getId())  // ✔ 진짜 카테고리 ID
                 .toList();
 
         // 조상 카테고리 포함해서 ID 수집
@@ -223,7 +237,7 @@ public class CouponStoreService {
         List<Long> categoryCouponIds = categoryCouponService
                 .getCategoryCouponsWithFetch(allCategoryIds)
                 .stream()
-                .map(cc -> cc.getId())
+                .map(CategoryCoupon::getId)
                 .toList();
 
         List<CouponStore> categoryStores = couponStoreRepository
@@ -255,6 +269,7 @@ public class CouponStoreService {
                 cs.getId(),
                 cs.getCoupon().getId(),
                 cs.getCoupon().getName(),
+                cs.getCoupon().getIssuableFrom(),
                 cs.getCoupon().getExpiresAt(),
                 cs.getOriginType(),
                 cs.getOriginId(),
@@ -266,6 +281,7 @@ public class CouponStoreService {
                 (cs.getCoupon().getCouponPolicy().getDiscountPercentage() != null)
                         ? cs.getCoupon().getCouponPolicy().getDiscountPercentage()
                         : null,
+                cs.getCoupon().getCouponPolicy().getMinimumOrderAmount(),
                 cs.getCoupon().getCouponPolicy().getMaximumDiscountAmount()
         );
     }

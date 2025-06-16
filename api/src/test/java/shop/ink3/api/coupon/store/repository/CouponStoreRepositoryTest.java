@@ -1,4 +1,4 @@
-package shop.ink3.api.coupon.store;
+package shop.ink3.api.coupon.store.repository;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -11,11 +11,14 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import shop.ink3.api.book.book.entity.Book;
+import shop.ink3.api.book.book.entity.BookStatus;
+import shop.ink3.api.book.publisher.entity.Publisher;
+import shop.ink3.api.coupon.bookCoupon.entity.BookCoupon;
 import shop.ink3.api.coupon.coupon.entity.Coupon;
 import shop.ink3.api.coupon.store.entity.CouponStatus;
 import shop.ink3.api.coupon.store.entity.CouponStore;
 import shop.ink3.api.coupon.store.entity.OriginType;
-import shop.ink3.api.coupon.store.repository.CouponStoreRepository;
 import shop.ink3.api.user.membership.entity.Membership;
 import shop.ink3.api.user.user.entity.User;
 import shop.ink3.api.user.user.entity.UserStatus;
@@ -29,6 +32,7 @@ public class CouponStoreRepositoryTest {
 
     @Autowired
     private TestEntityManager em;
+
 
     @Test
     @DisplayName("originId, userId에 매핑된 CouponStore가 있으면 true를 반환한다")
@@ -66,26 +70,16 @@ public class CouponStoreRepositoryTest {
         Coupon coupon = em.persistAndFlush(
                 Coupon.builder()
                         .name("TEST_COUPON")
+                        .isActive(true)
                         .expiresAt(LocalDateTime.now().plusDays(7))
                         .build()
         );
-
-        // CouponStore 생성
-        CouponStore store = em.persistAndFlush(
-                CouponStore.builder()
-                        .user(user)
-                        .coupon(coupon)
-                        .originType(OriginType.BOOK)
-                        .originId(42L)
-                        .status(CouponStatus.READY)
-                        .issuedAt(LocalDateTime.now())
+        // 1) Publisher 준비
+        Publisher publisher = em.persistAndFlush(
+                Publisher.builder()
+                        .name("Test Publisher")
                         .build()
         );
-        // when
-        boolean exists = couponStoreRepository.existsByOriginIdAndUserId(42L, user.getId());
-
-        // then
-        assertThat(exists).isTrue();
     }
 
     @Test

@@ -42,7 +42,7 @@ public class BirthdayCouponConsumer {
             BirthdayCouponMessage message = objectMapper.readValue(payload, BirthdayCouponMessage.class);
             System.out.println(message.userIds());
 
-            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(2L, "BIRTHDAY", LocalDateTime.now(), LocalDateTime.now().plusDays(30), Collections.emptyList(), Collections.emptyList());
+            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(2L, "BIRTHDAY", LocalDateTime.now(), LocalDateTime.now().plusDays(30), true, Collections.emptyList(), Collections.emptyList());
             CouponResponse coupon = couponService.createCoupon(couponCreateRequest);
             Long couponId = coupon.couponId();
 

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -39,6 +40,12 @@ class CouponStoreControllerTest {
 
     @Mock
     private CouponStoreService couponStoreService;
+
+    @Mock
+    private BookCouponRepository bookCouponRepository;
+
+    @Mock
+    private CategoryCouponRepository categoryCouponRepository;
 
     private CouponStoreController controller;
     private ObjectMapper objectMapper;
@@ -257,5 +264,4 @@ class CouponStoreControllerTest {
 
         verify(couponStoreService, times(1)).deleteStore(storeId);
     }
-
 }
