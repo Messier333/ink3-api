@@ -1,5 +1,6 @@
 package shop.ink3.api.user.like.service;
 
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,7 +40,8 @@ public class LikeService {
 
     @Transactional(readOnly = true)
     public LikeExistResponse hasUserLikedBook(long userId, long bookId) {
-        return new LikeExistResponse(likeRepository.existsByUserIdAndBookId(userId, bookId));
+        Like like = likeRepository.findByUserIdAndBookId(userId, bookId).orElse(null);
+        return new LikeExistResponse(Objects.isNull(like) ? null : like.getId());
     }
 
     public LikeResponse createLike(long userId, LikeCreateRequest request) {
