@@ -91,7 +91,7 @@ public class CouponStoreService {
     }
 
     @Transactional // write 트랜잭션
-    public CouponStore issueCommonCoupon(CommonCouponIssueRequest req) {
+    public void issueCommonCoupon(CommonCouponIssueRequest req) {
         // 1) 회원/쿠폰 존재 검증
         User user = userRepository.findById(req.userId())
                 .orElseThrow(() -> new UserNotFoundException(req.userId()));
@@ -120,7 +120,6 @@ public class CouponStoreService {
                 .issuedAt(LocalDateTime.now())
                 .build();
         couponStoreRepository.save(couponStore);
-        return couponStore;
     }
 
     /**
