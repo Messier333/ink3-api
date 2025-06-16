@@ -11,8 +11,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import shop.ink3.api.book.book.entity.Book;
+import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.common.uploader.MinioService;
+import shop.ink3.api.elastic.service.BookSearchService;
 import shop.ink3.api.order.orderBook.entity.OrderBook;
 import shop.ink3.api.order.orderBook.exception.OrderBookNotFoundException;
 import shop.ink3.api.order.orderBook.repository.OrderBookRepository;
@@ -47,12 +51,14 @@ public class ReviewService {
     private static final String POINT_REVIEW = "리뷰 작성에 대한 적립";
 
     private final UserRepository userRepository;
+    private final BookRepository bookRepository;
     private final OrderBookRepository orderBookRepository;
     private final ReviewRepository reviewRepository;
     private final ReviewImageRepository reviewImageRepository;
     private final PointPolicyService pointPolicyService;
     private final PointService pointService;
     private final MinioService minioService;
+    private final BookSearchService bookSearchService;
 
     @Value("${minio.review-bucket}")
     private String bucket;
@@ -70,6 +76,13 @@ public class ReviewService {
         if (reviewRepository.existsByOrderBookId(orderBook.getId())) {
             throw new ReviewAlreadyRegisterException(orderBook.getId());
         }
+
+        Book book = orderBook.getBook();
+
+        book.addRating(request.rating());
+        bookRepository.save(book);
+
+        bookSearchService.updateRatingAndReviewCount(book.getId(), book.getAverageRating(), book.getReviewCount());
 
         Review review = Review.builder()
                 .user(user)
@@ -97,7 +110,17 @@ public class ReviewService {
             throw new UnauthorizedOrderBookAccessException(userId, review.getOrderBook().getId());
         }
 
-        review.update(request.getTitle(), request.getContent(), request.getRating());
+        int oldRating = review.getRating();
+        int newRating = request.getRating();
+        review.update(request.getTitle(), request.getContent(), newRating);
+
+        Book book = review.getOrderBook().getBook();
+        book.updateRating(oldRating, newRating);
+
+        Long totalRating = reviewRepository.sumRatingByBookId(book.getId());
+        book.updateTotalRating(totalRating);
+        bookRepository.save(book);
+        bookSearchService.updateRating(book.getId(), book.getAverageRating());
 
         List<String> imageUrls;
         if (images != null && images.stream().anyMatch(image -> !image.isEmpty())) {

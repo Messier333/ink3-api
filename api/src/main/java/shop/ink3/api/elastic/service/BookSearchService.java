@@ -148,14 +148,14 @@ public class BookSearchService {
         }
     }
 
-    public void updateRatingAndReviewCount(long bookId, long rating, long reviewCount) {
+    public void updateRatingAndReviewCount(long bookId, double rating, long reviewCount) {
         BookDocument bookDocument = getBook(bookId);
         bookDocument.updateRating(rating);
         bookDocument.updateReviewCount(reviewCount);
         indexBook(bookDocument);
     }
 
-    public void updateRating(long bookId, long rating) {
+    public void updateRating(long bookId, double rating) {
         BookDocument bookDocument = getBook(bookId);
         bookDocument.updateRating(rating);
         indexBook(bookDocument);
