@@ -272,7 +272,7 @@ public class CouponServiceImpl implements CouponService {
         Set<Long> allCategoryIds = new HashSet<>();
 
         bookCategoryRepository.findAllByBookId(book.getId()).forEach(bc ->
-                categoryService.getAllAncestors(bc.getId()).forEach(c -> allCategoryIds.add(c.id()))
+                categoryService.getAllAncestors(bc.getCategory().getId()).forEach(c -> allCategoryIds.add(c.id()))
         );
 
         // 4) 부모 카테고리 기준 CategoryCoupon 엔티티 페이징 조회 (fetch join)
