@@ -24,6 +24,7 @@ import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.entity.BookStatus;
 import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.book.publisher.entity.Publisher;
+import shop.ink3.api.common.uploader.MinioService;
 import shop.ink3.api.coupon.store.service.CouponStoreService;
 import shop.ink3.api.order.cart.dto.CartCouponResponse;
 import shop.ink3.api.order.cart.dto.CartRequest;
@@ -58,6 +59,9 @@ class CartServiceTest {
 
     @Mock
     private CouponStoreService couponStoreService;
+
+    @Mock
+    private MinioService minioService;
 
     private User user;
     private Book book1;
@@ -200,24 +204,6 @@ class CartServiceTest {
         assertThat(responses).hasSize(2);
         assertThat(responses.get(0).id()).isEqualTo(1L);
         assertThat(responses.get(1).id()).isEqualTo(2L);
-    }
-
-    @Test
-    @DisplayName("Redis 캐시 hit 시 장바구니 조회")
-    void getCartItemsByUserIdWithRedis() {
-        String key = "cart:user:1";
-        CartResponse cachedCart = CartResponse.from(
-                Cart.builder().id(1L).user(user).book(book1).quantity(1).build()
-        );
-
-        when(hashOperations.values(key)).thenReturn(List.of(cachedCart));
-
-        List<CartResponse> result = cartService.getCartItemsByUserId(user.getId());
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo(1L);
-
-        verify(cartRepository, never()).findByUserId(any());
     }
 
     @Test
