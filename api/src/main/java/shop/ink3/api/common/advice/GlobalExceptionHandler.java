@@ -9,10 +9,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import shop.ink3.api.book.category.exception.CategoryHierarchyCycleException;
+import shop.ink3.api.book.category.exception.SelfParentingCategoryException;
 import shop.ink3.api.common.dto.CommonResponse;
 import shop.ink3.api.common.exception.AlreadyExistsException;
 import shop.ink3.api.common.exception.BadRequestException;
 import shop.ink3.api.common.exception.NotFoundException;
+import shop.ink3.api.coupon.store.exception.CouponInvalidPeriodException;
 import shop.ink3.api.order.order.exception.InsufficientBookStockException;
 import shop.ink3.api.payment.exception.PaymentParserFailException;
 import shop.ink3.api.payment.exception.PaymentProcessorFailException;
@@ -31,7 +34,11 @@ public class GlobalExceptionHandler {
                 .body(CommonResponse.error(HttpStatus.NOT_FOUND, e.getMessage(), null));
     }
 
-    @ExceptionHandler(value = {AlreadyExistsException.class})
+    @ExceptionHandler(value = {
+            AlreadyExistsException.class,
+            SelfParentingCategoryException.class,
+            CategoryHierarchyCycleException.class
+    })
     public ResponseEntity<CommonResponse<Void>> handleAlreadyExistsException(AlreadyExistsException e) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
@@ -86,19 +93,27 @@ public class GlobalExceptionHandler {
                 .body(CommonResponse.error(HttpStatus.BAD_REQUEST, "Invalid input values.", errors));
     }
 
+    @ExceptionHandler(CouponInvalidPeriodException.class)
+    public ResponseEntity<CommonResponse<String>> handleCouponInvalidPeriodException(
+            CouponInvalidPeriodException e) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(CommonResponse.error(HttpStatus.CONFLICT, "COUPON_INVALID_PERIOD", e.getMessage()));
+    }
+
     @ExceptionHandler(InsufficientBookStockException.class)
     public ResponseEntity<CommonResponse<String>> handleInsufficientBookStockException(
             InsufficientBookStockException e) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(CommonResponse.error(HttpStatus.CONFLICT, "BOOK_INSUFFICIENT_STOCK.", e.getMessage()));
+                .body(CommonResponse.error(HttpStatus.CONFLICT, "BOOK_INSUFFICIENT_STOCK", e.getMessage()));
     }
 
     @ExceptionHandler(PaymentParserFailException.class)
     public ResponseEntity<CommonResponse<String>> handlePaymentParserFailException(PaymentParserFailException e) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(CommonResponse.error(HttpStatus.BAD_REQUEST, "Payment parsing error.", e.getMessage()));
+                .body(CommonResponse.error(HttpStatus.BAD_REQUEST, "Payment parsing error", e.getMessage()));
     }
 
     @ExceptionHandler(PaymentProcessorFailException.class)

@@ -50,7 +50,6 @@ class PackagingServiceTest {
         assertNotNull(response);
         assertEquals("테스트", response.getName());
         assertEquals(1000, response.getPrice());
-        assertFalse(response.getIsAvailable());
     }
 
     @Test

@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - dev
-      
+
 env:
   RABBITMQ_HOST: ${{ secrets.RABBITMQ_HOST }}
   RABBITMQ_PORT: ${{ secrets.RABBITMQ_PORT }}
@@ -21,7 +21,7 @@ env:
   MINIO_HOST: ${{ secrets.MINIO_HOST }}
   MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
   MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
-
+  ELASTIC_KEY: ${{ secrets.ELASTIC_KEY }}
 
 
 jobs:
@@ -149,7 +149,7 @@ jobs:
         env:
           EUREKA_URL: ${{ secrets.DEV_EUREKA_URL }}
         run: |
-          nohup java -jar api/target/api-${{ steps.extract_version.outputs.version }}.jar \
+          nohup java -DELASTIC_KEY="$ELASTIC_KEY" -jar api/target/api-${{ steps.extract_version.outputs.version }}.jar \
             --server.port=10270 \
             --spring.profiles.active=test \
             --TTB_KEY=$TTB_KEY > app.log 2>&1 &
@@ -185,6 +185,7 @@ jobs:
           -DMINIO_HOST=$MINIO_HOST \
           -DMINIO_ACCESS_KEY=$MINIO_ACCESS_KEY \
           -DMINIO_SECRET_KEY=$MINIO_SECRET_KEY \
+          -DELASTIC_KEY="$ELASTIC_KEY" \
           -B
 
       - name: Print app log if health check fails

@@ -7,6 +7,7 @@ import shop.ink3.api.payment.entity.PaymentType;
 public record PaymentResponse (
     long id,
     long orderId,
+    String paymentKey,
     int usedPointAmount,
     int discountAmount,
     int paymentAmount,
@@ -18,6 +19,7 @@ public record PaymentResponse (
         return new PaymentResponse(
                 payment.getId(),
                 payment.getOrder().getId(),
+                payment.getPaymentKey(),
                 payment.getUsedPoint(),
                 payment.getDiscountPrice(),
                 payment.getPaymentAmount(),

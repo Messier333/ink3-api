@@ -1,5 +1,6 @@
 package shop.ink3.api.user.like.service;
 
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.like.dto.LikeCreateRequest;
+import shop.ink3.api.user.like.dto.LikeExistResponse;
 import shop.ink3.api.user.like.dto.LikeResponse;
 import shop.ink3.api.user.like.entity.Like;
 import shop.ink3.api.user.like.exception.LikeAlreadyExistsException;
@@ -36,6 +38,12 @@ public class LikeService {
         return PageResponse.from(likes.map(like -> LikeResponse.from(userId, like)));
     }
 
+    @Transactional(readOnly = true)
+    public LikeExistResponse hasUserLikedBook(long userId, long bookId) {
+        Like like = likeRepository.findByUserIdAndBookId(userId, bookId).orElse(null);
+        return new LikeExistResponse(Objects.isNull(like) ? null : like.getId());
+    }
+
     public LikeResponse createLike(long userId, LikeCreateRequest request) {
         if (!userRepository.existsById(userId)) {
             throw new UserNotFoundException(userId);
@@ -51,6 +59,10 @@ public class LikeService {
 
         User user = userRepository.getReferenceById(userId);
         Book book = bookRepository.getReferenceById(request.bookId());
+
+        book.incrementLikeCount();
+        bookRepository.save(book);
+
         Like like = Like.builder().user(user).book(book).build();
         return LikeResponse.from(likeRepository.save(like));
     }
@@ -58,6 +70,11 @@ public class LikeService {
     public void deleteLike(long userId, long likeId) {
         Like like = likeRepository.findByIdAndUserId(likeId, userId)
                 .orElseThrow(() -> new LikeNotFoundException(likeId));
+
+        Book book = like.getBook();
+        book.decrementLikeCount();
+        bookRepository.save(book);
+
         likeRepository.delete(like);
     }
 }

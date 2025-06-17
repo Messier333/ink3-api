@@ -44,7 +44,6 @@ class RefundPolicyServiceTest {
         // then
         assertNotNull(response);
         assertEquals("테스트", response.getName());
-        assertFalse(response.getIsAvailable());
     }
 
     @Test

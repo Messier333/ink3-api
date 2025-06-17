@@ -5,14 +5,17 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import lombok.extern.slf4j.Slf4j;
 import shop.ink3.api.book.book.entity.Book;
+import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
-import shop.ink3.api.book.common.exception.BookNotFoundException;
+import shop.ink3.api.common.uploader.MinioService;
 import shop.ink3.api.coupon.store.dto.CouponStoreDto;
 import shop.ink3.api.coupon.store.service.CouponStoreService;
 import shop.ink3.api.order.cart.dto.CartCouponResponse;
@@ -26,6 +29,7 @@ import shop.ink3.api.user.user.entity.User;
 import shop.ink3.api.user.user.exception.UserNotFoundException;
 import shop.ink3.api.user.user.repository.UserRepository;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,14 +37,21 @@ public class CartService {
     private static final String CART_KEY_PREFIX = "cart:user:";
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final MinioService minioService;
+
     private final CouponStoreService couponStoreService;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final CartRepository cartRepository;
 
+    @Value("${minio.book-bucket}")
+    private String bucket;
+
     public CartResponse addCartItem(CartRequest request) {
-        User user = userRepository.findById(request.userId()).orElseThrow(() -> new UserNotFoundException(request.userId()));
-        Book book = bookRepository.findById(request.bookId()).orElseThrow(() -> new BookNotFoundException(request.bookId()));
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new UserNotFoundException(request.userId()));
+        Book book = bookRepository.findById(request.bookId())
+                .orElseThrow(() -> new BookNotFoundException(request.bookId()));
 
         Cart cart = cartRepository.findByUserIdAndBookId(user.getId(), book.getId());
 
@@ -48,10 +59,10 @@ public class CartService {
             cart.updateQuantity(cart.getQuantity() + request.quantity());
         } else {
             cart = Cart.builder()
-                .user(user)
-                .book(book)
-                .quantity(request.quantity())
-                .build();
+                    .user(user)
+                    .book(book)
+                    .quantity(request.quantity())
+                    .build();
         }
         Cart savedCart = cartRepository.save(cart);
         CartResponse response = CartResponse.from(savedCart);
@@ -74,15 +85,68 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public List<CartResponse> getCartItemsByUserId(Long userId) {
+        List<Cart> carts = cartRepository.findByUserId(userId);
+        return carts.stream()
+            .map(cart -> {
+                String presignedUrl = getThumbnailUrl(cart.getBook());
+                return CartResponse.from(cart, presignedUrl);
+            })
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CartCouponResponse> getCartItemsWithCoupons(Long userId) {
+        List<Cart> carts = cartRepository.findByUserId(userId);
+        return carts.stream()
+            .map(cart -> {
+                String presignedUrl = getThumbnailUrl(cart.getBook());
+                List<CouponStoreDto> coupons = couponStoreService.getApplicableCouponStores(userId, cart.getBook().getId());
+                return CartCouponResponse.from(cart, coupons, presignedUrl);
+            })
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CartCouponResponse> getSelectCartsWithCoupon(Long userId, List<Long> cartIds) {
+        List<Cart> carts = cartRepository.findAllByUserIdAndIdIn(userId, cartIds);
+        return carts.stream()
+            .map(cart -> {
+                String presignedUrl = getThumbnailUrl(cart.getBook());
+                List<CouponStoreDto> coupons = couponStoreService.getApplicableCouponStores(userId, cart.getBook().getId());
+                return CartCouponResponse.from(cart, coupons, presignedUrl);
+            })
+            .toList();
+    }
+
+    // @Transactional(readOnly = true)
+    // public List<CartResponse> getCartItems(Long userId) {
+    //     List<Cart> carts = cartRepository.findByUserId(userId);
+    //     return carts.stream()
+    //         .map(cart -> {
+    //             String presignedUrl = getThumbnailUrl(cart.getBook());
+    //             return CartResponse.from(cart, presignedUrl);
+    //         })
+    //         .toList();
+    // }
+
+    @Transactional(readOnly = true)
+    public List<CartResponse> getCartItems(Long userId) {
         String key = CART_KEY_PREFIX + userId;
-        List<CartResponse> cacheCarts = hashOps().values(key);
-        if (!cacheCarts.isEmpty()) {
-            return cacheCarts;
+        HashOperations<String, String, CartResponse> ops = hashOps();
+
+        if (redisTemplate.hasKey(key)) {
+            log.info("[CACHE-HIT] userId={}", userId);
+            return ops.entries(key).values().stream().toList();
         }
+
+        log.info("[CACHE-MISS] userId={}", userId);
 
         List<Cart> carts = cartRepository.findByUserId(userId);
         List<CartResponse> responses = carts.stream()
-            .map(CartResponse::from)
+            .map(cart -> {
+                String presignedUrl = getThumbnailUrl(cart.getBook());
+                return CartResponse.from(cart, presignedUrl);
+            })
             .toList();
 
         for (int i = 0; i < carts.size(); i++) {
@@ -90,24 +154,6 @@ public class CartService {
         }
 
         return responses;
-    }
-
-    @Transactional(readOnly = true)
-    public List<CartCouponResponse> getCartItemsWithCoupons(Long userId) {
-        List<Cart> carts = cartRepository.findByUserId(userId);
-
-        return carts.stream()
-            .map(cart -> {
-                List<CouponStoreDto> coupons = couponStoreService.getApplicableCouponStores(userId, cart.getBook().getId());
-                return CartCouponResponse.from(cart, coupons);
-            })
-            .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CartResponse> getCartItems(Long userId) {
-        List<Cart> carts = cartRepository.findByUserId(userId);
-        return carts.stream().map(CartResponse::from).toList();
     }
 
     public void deleteCartItems(Long userId) {
@@ -137,5 +183,10 @@ public class CartService {
         String key = CART_KEY_PREFIX + cart.getUser().getId();
         hashOps().put(key, cart.getId().toString(), response);
         redisTemplate.expire(key, Duration.ofDays(3));
+    }
+
+    private String getThumbnailUrl(Book book) {
+        return book.getThumbnailUrl().startsWith("https") ? book.getThumbnailUrl()
+            : minioService.getPresignedUrl(book.getThumbnailUrl(), bucket);
     }
 }

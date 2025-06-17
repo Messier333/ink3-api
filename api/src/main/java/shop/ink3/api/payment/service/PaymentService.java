@@ -21,6 +21,7 @@ import shop.ink3.api.order.order.service.OrderService;
 import shop.ink3.api.order.orderBook.service.OrderBookService;
 import shop.ink3.api.order.orderPoint.entity.OrderPoint;
 import shop.ink3.api.order.orderPoint.service.OrderPointService;
+import shop.ink3.api.payment.dto.PaymentCancelRequest;
 import shop.ink3.api.payment.dto.PaymentConfirmRequest;
 import shop.ink3.api.payment.dto.PaymentResponse;
 import shop.ink3.api.payment.dto.ZeroPaymentRequest;
@@ -58,103 +59,6 @@ public class PaymentService {
     private final PaymentResponseParserResolver paymentResponseParserResolver;
     private final ApplicationEventPublisher eventPublisher;
 
-
-    // 결제 승인 API 호출 및 ApproveResponse 반환
-    @Transactional(readOnly = true)
-    public String callPaymentAPI(PaymentConfirmRequest confirmRequest) {
-        PaymentProcessor paymentProcessor = paymentProcessorResolver.getPaymentProcessor(
-                String.format("%s-%s", String.valueOf(confirmRequest.paymentType()).toUpperCase(), "PROCESSOR"));
-        return paymentProcessor.processPayment(confirmRequest);
-    }
-
-    // 생성 (결제 성공)
-    public PaymentResponse createPayment(PaymentConfirmRequest confirmRequest, String paymentApproveResponse) {
-        // 특정 주문에 대한 payment가 존재하는지 확인.
-        if (paymentRepository.findByOrderId(confirmRequest.orderId()).isPresent()) {
-            throw new PaymentAlreadyExistsException(confirmRequest.orderId());
-        }
-
-        PaymentParser paymentParser = paymentResponseParserResolver.getPaymentParser(
-                String.format("%s-%s", String.valueOf(confirmRequest.paymentType()).toUpperCase(), "PARSER"));
-        Payment payment = paymentParser.paymentResponseParser(confirmRequest, paymentApproveResponse);
-
-        payment.updateDiscountAndPoint(confirmRequest.usedPointAmount(), confirmRequest.discountAmount());
-        orderService.updateOrderStatus(confirmRequest.orderId(), new OrderStatusUpdateRequest(OrderStatus.CONFIRMED));
-        Payment savePayment = paymentRepository.save(payment);
-
-        if (!Objects.isNull(confirmRequest.userId())) {
-            // 비동기 이벤트 핸들러 ( 포인트 사용 내역 및 적립 내역 추가 )
-            eventPublisher.publishEvent(new PointHistoryAfterPaymentEven(
-                    confirmRequest.userId(),
-                    confirmRequest.orderId(),
-                    confirmRequest.amount(),
-                    confirmRequest.usedPointAmount())
-            );
-        }
-        return PaymentResponse.from(savePayment);
-    }
-
-    // 생성 (0원 결제)
-    public PaymentResponse createZeroPayment(ZeroPaymentRequest request) {
-        Order order = orderRepository.findById(request.orderId())
-                .orElseThrow(() -> new OrderNotFoundException(request.orderId()));
-        Payment payment = Payment.builder()
-                .order(order)
-                .paymentKey(null)
-                .usedPoint(request.usedPointAmount())
-                .discountPrice(request.discountAmount())
-                .paymentAmount(request.amount())
-                .paymentType(PaymentType.POINT)
-                .requestAt(LocalDateTime.now())
-                .approvedAt(LocalDateTime.now())
-                .build();
-        return PaymentResponse.from(paymentRepository.save(payment));
-    }
-
-    // 결제 실패
-    public void failPayment(long orderId, long userId) {
-        // 주문된 도서들의 재고를 원상복구
-        orderBookService.resetBookQuantity(orderId);
-        // 주문 상태 변경
-        orderService.updateOrderStatus(orderId, new OrderStatusUpdateRequest(OrderStatus.FAILED));
-        // 사용된 쿠폰 되돌리기 (포인트는 결제 후 이기 때문에 처리 X)
-        orderBookService.getOrderCouponStoreId(orderId)
-                .ifPresent(couponStoreId -> {
-                    CouponStoreUpdateRequest request = new CouponStoreUpdateRequest(CouponStatus.READY, null);
-                    couponStoreService.updateStore(couponStoreId, request);
-                });
-    }
-
-    // 결제 취소
-    public void cancelPayment(long orderId, long userId) {
-        OrderResponse orderResponse = orderService.getOrder(orderId);
-        // 결제 취소 가능 여부 확인
-        if (!orderResponse.getStatus().equals(OrderStatus.CONFIRMED)) {
-            throw new PaymentCancelNotAllowedException();
-        }
-
-        // 금액 환불
-        Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new PaymentNotFoundException(orderId));
-        pointService.earnPoint(userId, new UserPointRequest(payment.getPaymentAmount(), PAYMENT_CANCEL_MESSAGE));
-
-        // 주문된 도서들의 재고를 원상복구
-        orderBookService.resetBookQuantity(orderId);
-        // 주문 상태 변경
-        orderService.updateOrderStatus(orderId, new OrderStatusUpdateRequest(OrderStatus.CANCELLED));
-        // 사용된 쿠폰 되돌리기
-        orderBookService.getOrderCouponStoreId(orderId)
-                .ifPresent(couponStoreId -> {
-                    CouponStoreUpdateRequest request = new CouponStoreUpdateRequest(CouponStatus.READY, null);
-                    couponStoreService.updateStore(couponStoreId, request);
-                });
-        // 포인트 취소 (사용한 것도 취소 적립된 것도 취소)
-        List<OrderPoint> orderPoints = orderPointService.getOrderPoints(orderId);
-        for (OrderPoint orderPoint : orderPoints) {
-            pointService.cancelPoint(userId, orderPoint.getPointHistory().getId());
-        }
-    }
-
     // 조회
     @Transactional(readOnly = true)
     public PaymentResponse getPayment(long orderId) {
@@ -168,5 +72,99 @@ public class PaymentService {
         orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         paymentRepository.deleteByOrderId(orderId);
+    }
+
+    // 결제 승인 API 호출 및 ApproveResponse 반환
+    @Transactional(readOnly = true)
+    public String callPaymentAPI(PaymentConfirmRequest confirmRequest) {
+        PaymentProcessor paymentProcessor = paymentProcessorResolver.getPaymentProcessor(
+                String.format("%s-%s", String.valueOf(confirmRequest.paymentType()).toUpperCase(), "PROCESSOR"));
+        return paymentProcessor.processPayment(confirmRequest);
+    }
+
+    // 생성 (결제 성공)
+    public PaymentResponse createPayment(PaymentConfirmRequest confirmRequest, String paymentApproveResponse) {
+        if (paymentRepository.findByOrderId(confirmRequest.orderId()).isPresent()) {
+            throw new PaymentAlreadyExistsException(confirmRequest.orderId());
+        }
+
+        // 외부 api 파싱 -> payment 객체 생성
+        PaymentParser paymentParser = paymentResponseParserResolver.getPaymentParser(
+                String.format("%s-%s", String.valueOf(confirmRequest.paymentType()).toUpperCase(), "PARSER"));
+        Payment payment = paymentParser.paymentResponseParser(confirmRequest, paymentApproveResponse);
+
+        // 주문 상태 변경 및 결제 저장
+        orderService.updateOrderStatus(confirmRequest.orderId(), new OrderStatusUpdateRequest(OrderStatus.CONFIRMED));
+        Payment savePayment = paymentRepository.save(payment);
+
+        // 0원 결제일 경우 분기문 처리 (포인트 적립 X )
+        if(!payment.getPaymentType().equals(PaymentType.POINT) && confirmRequest.userId()!=null){
+            // 비동기 이벤트 핸들러 ( 포인트 사용 내역 및 적립 내역 추가 )
+            eventPublisher.publishEvent(new PointHistoryAfterPaymentEven(
+                    confirmRequest.userId(),
+                    confirmRequest.orderId(),
+                    confirmRequest.amount(),
+                    confirmRequest.usedPointAmount())
+            );
+        }
+        return PaymentResponse.from(savePayment);
+    }
+
+    // 결제 실패
+    public void failPayment(long orderId, Long userId) {
+        // 주문된 도서들의 재고를 원상복구
+        orderBookService.resetBookQuantity(orderId);
+        // 주문 상태 변경
+        orderService.updateOrderStatus(orderId, new OrderStatusUpdateRequest(OrderStatus.FAILED));
+
+        if(Objects.nonNull(userId)){
+            // 사용된 쿠폰 되돌리기 (포인트는 결제 후 이기 때문에 처리 X)
+            orderBookService.getOrderCouponStoreId(orderId)
+                    .ifPresent(couponStoreId -> {
+                        CouponStoreUpdateRequest request = new CouponStoreUpdateRequest(CouponStatus.READY, null);
+                        couponStoreService.updateStore(couponStoreId, request);
+                    });
+        }
+    }
+
+    // 결제 취소
+    public void cancelPayment(long orderId, Long userId, PaymentCancelRequest cancelRequest) {
+        // 결제 취소 가능 여부 확인
+        OrderResponse orderResponse = orderService.getOrder(orderId);
+        if (!orderResponse.getStatus().equals(OrderStatus.CONFIRMED)) {
+            throw new PaymentCancelNotAllowedException();
+        }
+
+        // 금액 환불
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new PaymentNotFoundException(orderId));
+        // 외부 API 결제 -> 결제 취소 요청
+        PaymentProcessor paymentProcessor = paymentProcessorResolver.getPaymentProcessor(
+                String.format("%s-%s", String.valueOf(payment.getPaymentType()).toUpperCase(), "PROCESSOR"));
+        paymentProcessor.cancelPayment(cancelRequest);
+
+        // 주문된 도서들의 재고를 원상복구
+        orderBookService.resetBookQuantity(orderId);
+        // 주문 상태 변경
+        orderService.updateOrderStatus(orderId, new OrderStatusUpdateRequest(OrderStatus.CANCELLED));
+
+        if(Objects.nonNull(userId)){
+            // 사용된 쿠폰 되돌리기
+            orderBookService.getOrderCouponStoreId(orderId)
+                    .ifPresent(couponStoreId -> {
+                        CouponStoreUpdateRequest request = new CouponStoreUpdateRequest(CouponStatus.READY, null);
+                        couponStoreService.updateStore(couponStoreId, request);
+                    });
+
+            // 포인트 취소 (사용한 것도 취소 적립된 것도 취소)
+            List<OrderPoint> orderPoints = orderPointService.getOrderPoints(orderId);
+            for (OrderPoint orderPoint : orderPoints) {
+                pointService.cancelPoint(userId, orderPoint.getPointHistory().getId());
+            }
+            // 0원 결제 시 -> 전체 환불
+            if(payment.getPaymentType().equals(PaymentType.POINT)) {
+                pointService.earnPoint(userId, new UserPointRequest(payment.getPaymentAmount(), PAYMENT_CANCEL_MESSAGE));
+            }
+        }
     }
 }

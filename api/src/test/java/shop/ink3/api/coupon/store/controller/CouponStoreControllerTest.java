@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -55,9 +56,7 @@ class CouponStoreControllerTest {
 
         // Controller에 mock 주입
         controller = new CouponStoreController(
-                couponStoreService,
-                bookCouponRepository,
-                categoryCouponRepository
+                couponStoreService
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
@@ -65,62 +64,6 @@ class CouponStoreControllerTest {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    }
-
-    @Test
-    @DisplayName("POST /users/coupon-stores - 쿠폰 발급 성공")
-    void issueCoupon_success() throws Exception {
-        // Arrange
-        CouponIssueRequest request = new CouponIssueRequest(
-                1L,           // userId
-                100L,         // couponId
-                OriginType.BOOK,
-                200L          // originId
-        );
-
-        // user와 coupon을 non-null mock으로 생성하고 필요한 stub 설정
-        User mockUser = mock(User.class);
-        when(mockUser.getId()).thenReturn(1L);
-        when(mockUser.getName()).thenReturn("테스터");
-
-        Coupon mockCoupon = mock(Coupon.class);
-        when(mockCoupon.getId()).thenReturn(100L);
-        when(mockCoupon.getName()).thenReturn("BOOK100");
-        when(mockCoupon.getExpiresAt()).thenReturn(LocalDateTime.of(2025, 12, 31, 0, 0));
-
-        // 실제 저장된 CouponStore 엔티티 예시 (user, coupon을 mock으로 넣어야 NullPointerException이 발생하지 않음)
-        CouponStore dummyStore = CouponStore.builder()
-                .id(1L)
-                .user(mockUser)
-                .coupon(mockCoupon)
-                .originType(OriginType.BOOK)
-                .originId(200L)
-                .status(CouponStatus.READY)
-                .issuedAt(LocalDateTime.of(2025, 6, 4, 12, 0))
-                .build();
-
-        when(couponStoreService.issueCoupon(
-                ArgumentMatchers.<CouponIssueRequest>any()))
-                .thenReturn(dummyStore);
-
-        // Act & Assert
-        mockMvc.perform(post("/users/coupon-stores")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                // CouponStoreResponse.fromEntity 에서 userId/userName/couponId/couponName도 채워지므로, 그 부분도 검증
-                .andExpect(jsonPath("$.data.storeId", is(1)))
-                .andExpect(jsonPath("$.data.userId", is(1)))
-                .andExpect(jsonPath("$.data.userName", is("테스터")))
-                .andExpect(jsonPath("$.data.couponId", is(100)))
-                .andExpect(jsonPath("$.data.couponName", is("BOOK100")))
-                .andExpect(jsonPath("$.data.originType", is("BOOK")))
-                .andExpect(jsonPath("$.data.originId", is(200)))
-                .andExpect(jsonPath("$.data.status", is("READY")))
-                .andExpect(jsonPath("$.data.issuedAt", contains(2025, 6, 4, 12, 0)));
-
-        verify(couponStoreService, times(1))
-                .issueCoupon(ArgumentMatchers.<CouponIssueRequest>any());
     }
 
 
@@ -320,44 +263,5 @@ class CouponStoreControllerTest {
                 .andExpect(jsonPath("$.data").doesNotExist());
 
         verify(couponStoreService, times(1)).deleteStore(storeId);
-    }
-
-    @Test
-    @DisplayName("GET /applicable-coupons?userId={userId}&bookId={bookId} - 적용 가능 쿠폰 조회")
-    void getApplicableCoupons_success() throws Exception {
-        // Arrange
-        Long userId = 1L;
-        Long bookId = 10L;
-        CouponStoreDto dto = new CouponStoreDto(
-                7L,
-                100L,
-                "DISCOUNT",
-                LocalDateTime.of(2025, 12, 31, 0, 0),
-                OriginType.BOOK,
-                10L,
-                CouponStatus.READY,
-                DiscountType.FIXED,
-                3000,
-                null,
-                10000
-        );
-
-        when(couponStoreService.getApplicableCouponStores(userId, bookId))
-                .thenReturn(List.of(dto));
-
-        // Act & Assert
-        mockMvc.perform(get("/applicable-coupons")
-                        .param("userId", String.valueOf(userId))
-                        .param("bookId", String.valueOf(bookId))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                // 해당 엔드포인트는 List<CouponStoreDto>를 직접 반환하므로, 최상위 배열 형태로 검증
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].storeId", is(7)))
-                .andExpect(jsonPath("$.data[0].couponId", is(100)))
-                .andExpect(jsonPath("$.data[0].originType", is("BOOK")));
-
-        verify(couponStoreService, times(1))
-                .getApplicableCouponStores(userId, bookId);
     }
 }

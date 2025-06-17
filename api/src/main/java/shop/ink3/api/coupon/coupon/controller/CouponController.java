@@ -1,9 +1,7 @@
 package shop.ink3.api.coupon.coupon.controller;
 
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -81,6 +79,16 @@ public class CouponController {
             @PathVariable long categoryId,
             Pageable pageable) {
         PageResponse<CouponResponse> list = couponService.getCouponsByCategoryId(categoryId, pageable);
+        return ResponseEntity.ok(CommonResponse.success(list));
+    }
+
+    /** 부모 카테고리 쿠폰 조회 */
+    @GetMapping("/by-book/{bookId}/parent-categories")
+    public ResponseEntity<CommonResponse<PageResponse<CouponResponse>>> getParentCategoryCoupons(
+            @PathVariable Long bookId,
+            Pageable pageable
+    ) {
+        PageResponse<CouponResponse> list = couponService.getCouponsByParentId(bookId, pageable);
         return ResponseEntity.ok(CommonResponse.success(list));
     }
 

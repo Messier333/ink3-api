@@ -21,8 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 import shop.ink3.api.common.dto.CommonResponse;
-import shop.ink3.api.coupon.bookCoupon.entity.BookCouponRepository;
-import shop.ink3.api.coupon.categoryCoupon.entity.CategoryCouponRepository;
+import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.coupon.store.dto.CouponIssueRequest;
 import shop.ink3.api.coupon.store.dto.CouponStoreDto;
 import shop.ink3.api.coupon.store.dto.CouponStoreResponse;
@@ -40,41 +39,44 @@ public class MeCouponStoreController {
 
     // 쿠폰 발급 (store 생성)
     @PostMapping("/users/coupon-stores")
-    public ResponseEntity<CommonResponse<CouponStoreResponse>> issueCoupon(@RequestBody CouponIssueRequest request) {
-        CouponStoreResponse response = CouponStoreResponse.fromEntity(couponStoreService.issueCoupon(request));
+    public ResponseEntity<CommonResponse<CouponStoreResponse>> issueCoupon(
+            @RequestHeader(name = "X-User-Id") Long userId,
+            @RequestBody CouponIssueRequest request) {
+        CouponStoreResponse response = CouponStoreResponse.fromEntity(couponStoreService.issueCoupon(request, userId));
         return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.create(response));
     }
 
     // ✅ 유저의 전체 쿠폰 조회 → /users/{userId}/stores
     @GetMapping("/users/coupon-stores")
-    public ResponseEntity<CommonResponse<Page<CouponStoreResponse>>> getStoresByUserId(
+    public ResponseEntity<CommonResponse<PageResponse<CouponStoreResponse>>> getStoresByUserId(
         @RequestHeader(name = "X-User-Id") Long userId,
         @PageableDefault(sort = "issuedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
         Page<CouponStore> stores = couponStoreService.getStoresPagingByUserId(userId, pageable);
-        Page<CouponStoreResponse> responses = stores.map(CouponStoreResponse::fromEntity);
-
-        return ResponseEntity.ok(CommonResponse.success(responses));
+        Page<CouponStoreResponse> mapped = stores.map(CouponStoreResponse::toEntity);
+        return ResponseEntity.ok(CommonResponse.success(PageResponse.from(mapped)));
     }
 
-    // ✅ 유저의 미사용 쿠폰만 조회 → /users/{userId}/stores/unused
+    // ✅ 유저의 미사용 쿠폰만 조회
     @GetMapping("/users/coupon-stores/status-unused")
-    public ResponseEntity<CommonResponse<Page<CouponStoreResponse>>> getUnusedStores(
+    public ResponseEntity<CommonResponse<PageResponse<CouponStoreResponse>>> getUnusedStores(
         @RequestHeader(name = "X-User-Id") Long userId,
         @PageableDefault(sort = "usedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<CouponStore> stores = couponStoreService.getUnusedStoresPagingByUserId(userId, pageable);
-        Page<CouponStoreResponse> responses = stores.map(CouponStoreResponse::fromEntity);
 
-        return ResponseEntity.ok(CommonResponse.success(responses));
+        Page<CouponStore> stores = couponStoreService.getUnusedStoresPagingByUserId(userId, pageable);
+        Page<CouponStoreResponse> mapped = stores.map(CouponStoreResponse::toEntity);
+        return ResponseEntity.ok(CommonResponse.success(PageResponse.from(mapped)));
     }
 
+    // ✅ 유저의 사용/만료된 쿠폰만 조회
     @GetMapping("/users/coupon-stores/status-used")
-    public ResponseEntity<CommonResponse<Page<CouponStoreResponse>>> getUsedExpiredStores(
+    public ResponseEntity<CommonResponse<PageResponse<CouponStoreResponse>>> getUsedExpiredStores(
         @RequestHeader(name = "X-User-Id") Long userId,
         @PageableDefault(sort = "usedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<CouponStore> stores = couponStoreService.getUsedOrExpiredStoresPagingByUserId(userId, pageable);
-        Page<CouponStoreResponse> responses = stores.map(CouponStoreResponse::fromEntity);
 
-        return ResponseEntity.ok(CommonResponse.success(responses));
+        Page<CouponStore> stores = couponStoreService.getUsedOrExpiredStoresPagingByUserId(userId, pageable);
+        Page<CouponStoreResponse> mapped = stores.map(CouponStoreResponse::toEntity);
+        return ResponseEntity.ok(CommonResponse.success(PageResponse.from(mapped)));
     }
 
     // ✅ 특정 쿠폰으로 발급된 store 전체 조회 → /coupons/{couponId}/stores
@@ -86,6 +88,8 @@ public class MeCouponStoreController {
             .toList();
         return ResponseEntity.ok(CommonResponse.success(responses));
     }
+
+
 
     // ✅ 쿠폰 사용 여부 업데이트
     @PutMapping("/coupon-stores/{storeId}")

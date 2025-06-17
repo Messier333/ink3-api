@@ -3,11 +3,15 @@ package shop.ink3.api.user.user.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.common.exception.DormantException;
 import shop.ink3.api.user.common.exception.InvalidPasswordException;
@@ -15,6 +19,7 @@ import shop.ink3.api.user.common.exception.WithdrawnException;
 import shop.ink3.api.user.membership.entity.Membership;
 import shop.ink3.api.user.membership.exception.MembershipNotFoundException;
 import shop.ink3.api.user.membership.repository.MembershipRepository;
+import shop.ink3.api.user.point.policy.service.PointPolicyService;
 import shop.ink3.api.user.social.dto.SocialUserResponse;
 import shop.ink3.api.user.social.entity.Social;
 import shop.ink3.api.user.social.repository.SocialRepository;
@@ -37,6 +42,7 @@ import shop.ink3.api.user.user.exception.UserAuthNotFoundException;
 import shop.ink3.api.user.user.exception.UserNotFoundException;
 import shop.ink3.api.user.user.repository.UserRepository;
 
+@Slf4j
 @Transactional
 @RequiredArgsConstructor
 @Service
@@ -45,6 +51,7 @@ public class UserService {
     private final MembershipRepository membershipRepository;
     private final SocialRepository socialRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PointPolicyService pointPolicyService;
 
     @Transactional(readOnly = true)
     public IdentifierAvailabilityResponse isLoginIdAvailable(String loginId) {
@@ -129,7 +136,15 @@ public class UserService {
                 .status(UserStatus.ACTIVE)
                 .createdAt(LocalDateTime.now())
                 .build();
-        return UserResponse.from(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        userRepository.flush();
+
+        try {
+            pointPolicyService.assignSignupPoint(savedUser.getId());
+        } catch (Exception e) {
+            log.warn("신규 회원 포인트 적립 실패: {}", e.getMessage());
+        }
+        return UserResponse.from(savedUser);
     }
 
     public UserResponse createSocialUser(SocialUserCreateRequest request) {

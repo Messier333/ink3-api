@@ -1,6 +1,5 @@
 package shop.ink3.api.coupon.rabbitMq.consume;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,7 @@ import shop.ink3.api.coupon.coupon.dto.CouponCreateRequest;
 import shop.ink3.api.coupon.coupon.dto.CouponResponse;
 import shop.ink3.api.coupon.coupon.service.Impl.CouponServiceImpl;
 import shop.ink3.api.coupon.rabbitMq.message.WelcomeCouponMessage;
-import shop.ink3.api.coupon.store.dto.CouponIssueRequest;
+import shop.ink3.api.coupon.store.dto.CommonCouponIssueRequest;
 import shop.ink3.api.coupon.store.entity.OriginType;
 import shop.ink3.api.coupon.store.service.CouponStoreService;
 
@@ -25,21 +24,22 @@ public class WelcomeCouponConsumer {
     private final CouponStoreService couponStoreService;
     private final CouponServiceImpl couponService;
 
-    @RabbitListener(queues = "coupon.welcome",
-    containerFactory = "pojoListenerContainerFactory")
+    @RabbitListener(queues = "coupon.welcome", containerFactory = "pojoListenerContainerFactory")
     @Retryable(
             maxAttempts = 3,
             backoff = @Backoff(delay = 2000, multiplier = 2)
     )
     public void consumeWelcome(WelcomeCouponMessage message) {
         try{
+            log.info("수신 성공!");
             System.out.println(message.userId());
-            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(1L, "WELCOME", LocalDateTime.now(), LocalDateTime.now().plusDays(30), Collections.emptyList(), Collections.emptyList());
+            CouponCreateRequest couponCreateRequest = new CouponCreateRequest(1L, "WELCOME", LocalDateTime.now(), LocalDateTime.now().plusDays(30), true, Collections.emptyList(), Collections.emptyList());
+
             CouponResponse coupon = couponService.createCoupon(couponCreateRequest);
             Long couponId = coupon.couponId();
-
-            couponStoreService.issueCoupon(
-                    new CouponIssueRequest(message.userId(), couponId, OriginType.WELCOME, null)
+            log.info("userId={}, couponId={}", message.userId(), couponId);
+            couponStoreService.issueCommonCoupon(
+                    new CommonCouponIssueRequest(message.userId(), couponId, OriginType.WELCOME, null)
             );
             log.info("쿠폰 발급 성공~!");
         }catch (Exception e){

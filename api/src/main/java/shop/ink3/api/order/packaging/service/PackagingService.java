@@ -26,9 +26,8 @@ public class PackagingService {
         Packaging packaging = Packaging.builder()
                 .name(request.getName())
                 .price(request.getPrice())
-                .isAvailable(false)
+                .isAvailable(true)
                 .build();
-
         return PackagingResponse.from(packagingRepository.save(packaging));
     }
 

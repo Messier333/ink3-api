@@ -1,11 +1,12 @@
 package shop.ink3.api.coupon.categoryCoupon.entity;
 
-import jakarta.persistence.EntityNotFoundException;
 import java.util.Collection;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -20,14 +21,5 @@ public class CategoryCouponService {
     @Transactional(readOnly = true)
     public List<CategoryCoupon> getCategoryCouponsWithFetch(Collection<Long> categoryIds) {
         return categoryCouponRepository.findAllByCategoryIdInWithFetch(categoryIds);
-    }
-
-    /**
-     * 특정 CategoryCoupon ID 하나만 조회하면서 fetch join
-     */
-    @Transactional(readOnly = true)
-    public CategoryCoupon getCategoryCouponWithFetch(Long id) {
-        return categoryCouponRepository.findByIdWithCategoryAndCoupon(id)
-                .orElseThrow(() -> new EntityNotFoundException("CategoryCoupon not found: " + id));
     }
 }

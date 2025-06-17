@@ -3,172 +3,125 @@ package shop.ink3.api.book.book.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.multipart.MultipartFile;
-
-import lombok.RequiredArgsConstructor;
 import shop.ink3.api.book.author.entity.Author;
-import shop.ink3.api.book.author.exception.AuthorNotFoundException;
 import shop.ink3.api.book.author.repository.AuthorRepository;
-import shop.ink3.api.book.book.dto.AuthorDto;
-import shop.ink3.api.book.book.dto.AuthorRoleRequest;
+import shop.ink3.api.book.book.dto.AdminBookResponse;
+import shop.ink3.api.book.book.dto.BookAuthorDto;
 import shop.ink3.api.book.book.dto.BookCreateRequest;
+import shop.ink3.api.book.book.dto.BookDetailResponse;
+import shop.ink3.api.book.book.dto.BookPreviewResponse;
 import shop.ink3.api.book.book.dto.BookRegisterRequest;
-import shop.ink3.api.book.book.dto.BookResponse;
 import shop.ink3.api.book.book.dto.BookUpdateRequest;
-import shop.ink3.api.book.book.dto.MainBookResponse;
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.enums.SortType;
 import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.exception.DuplicateIsbnException;
-import shop.ink3.api.book.book.exception.InvalidCategoryDepthException;
 import shop.ink3.api.book.book.exception.InvalidCategorySelectionException;
 import shop.ink3.api.book.book.external.aladin.dto.AladinBookResponse;
 import shop.ink3.api.book.book.repository.BookRepository;
-import shop.ink3.api.book.bookCategory.entity.BookCategory;
-import shop.ink3.api.book.category.dto.CategoryResponse;
+import shop.ink3.api.book.bookauthor.entity.BookAuthor;
+import shop.ink3.api.book.bookauthor.repository.BookAuthorRepository;
+import shop.ink3.api.book.bookcategory.entity.BookCategory;
+import shop.ink3.api.book.bookcategory.repository.BookCategoryRepository;
+import shop.ink3.api.book.booktag.entity.BookTag;
+import shop.ink3.api.book.booktag.repository.BookTagRepository;
+import shop.ink3.api.book.category.dto.CategoryFlatDto;
 import shop.ink3.api.book.category.entity.Category;
 import shop.ink3.api.book.category.exception.CategoryNotFoundException;
 import shop.ink3.api.book.category.repository.CategoryRepository;
+import shop.ink3.api.book.category.service.CategoryService;
 import shop.ink3.api.book.publisher.entity.Publisher;
-import shop.ink3.api.book.publisher.exception.PublisherNotFoundException;
 import shop.ink3.api.book.publisher.repository.PublisherRepository;
 import shop.ink3.api.book.tag.entity.Tag;
-import shop.ink3.api.book.tag.exception.TagNotFoundException;
 import shop.ink3.api.book.tag.repository.TagRepository;
 import shop.ink3.api.common.dto.PageResponse;
-import shop.ink3.api.common.uploader.MinioUploader;
-import shop.ink3.api.common.util.PresignUrlPrefixUtil;
-import shop.ink3.api.review.review.repository.ReviewRepository;
-import shop.ink3.api.user.like.repository.LikeRepository;
+import shop.ink3.api.common.uploader.MinioService;
+import shop.ink3.api.elastic.model.BookDocument;
+import shop.ink3.api.elastic.service.BookSearchService;
 
 @Transactional
 @RequiredArgsConstructor
 @Service
 public class BookService {
     private final BookRepository bookRepository;
-    private final ReviewRepository reviewRepository;
     private final CategoryRepository categoryRepository;
     private final AuthorRepository authorRepository;
     private final PublisherRepository publisherRepository;
     private final TagRepository tagRepository;
-    private final LikeRepository likeRepository;
-    private final MinioUploader minioUploader;
-    private final PresignUrlPrefixUtil presignUrlPrefixUtil;
+    private final BookTagRepository bookTagRepository;
+    private final BookAuthorRepository bookAuthorRepository;
+    private final BookCategoryRepository bookCategoryRepository;
+    private final MinioService minioService;
+    private final CategoryService categoryService;
+    private final BookSearchService bookSearchService;
 
     @Value("${minio.book-bucket}")
     private String bucket;
 
-    // 단건 조회
     @Transactional(readOnly = true)
-    public BookResponse getBook(Long bookId) {
+    public BookDetailResponse getBookDetail(Long bookId) {
         Book book = bookRepository.findById(bookId).orElseThrow(() -> new BookNotFoundException(bookId));
-        double averageRating = getAverageRating(bookId);
-        long likeCount = likeRepository.countByBookId(book.getId());
-
-        String imageUrl = book.getThumbnailUrl();
-        if (imageUrl != null && !imageUrl.startsWith("https")) {
-            imageUrl = presignUrlPrefixUtil.addPrefixUrl(minioUploader.getPresignedUrl(book.getThumbnailUrl(), bucket));
-        }
-        return BookResponse.from(book, imageUrl, averageRating, likeCount);
+        List<List<CategoryFlatDto>> categories = getBookCategories(bookId);
+        List<BookAuthorDto> authors = getBookAuthors(bookId);
+        List<String> tags = getBookTags(bookId);
+        return BookDetailResponse.from(
+                book,
+                getThumbnailUrl(book),
+                categories,
+                authors,
+                tags
+        );
     }
 
     @Transactional(readOnly = true)
-    public BookResponse getBookWithCategory(Long bookId) {
-        Book book = bookRepository.findById(bookId).orElseThrow(() -> new BookNotFoundException(bookId));
-        List<Category> categories = new ArrayList<>();
-        List<Category> list = book.getBookCategories()
-                .stream()
-                .map(BookCategory::getCategory)
-                .toList();
-        for(Category category:list) {
-            categories.addAll(categoryRepository.findAllAncestors(category.getId()));
-        }
-        String imageUrl = book.getThumbnailUrl();
-        if (imageUrl != null && !imageUrl.startsWith("https")) {
-            imageUrl = presignUrlPrefixUtil.addPrefixUrl(minioUploader.getPresignedUrl(book.getThumbnailUrl(), bucket));
-        }
-        return BookResponse.from(book, imageUrl, categories.stream().map(CategoryResponse::from).toList());
-    }
-
-    // 전체 조회
-
-    @Transactional(readOnly = true)
-    public PageResponse<BookResponse> getBooks(Pageable pageable) {
+    public PageResponse<BookPreviewResponse> getBooks(Pageable pageable) {
         Page<Book> books = bookRepository.findAll(pageable);
-        Page<BookResponse> bookResponses = books.map(book -> {
-            String imageUrl = book.getThumbnailUrl();
-
-            if (imageUrl != null && !imageUrl.startsWith("https")) {
-                imageUrl = presignUrlPrefixUtil.addPrefixUrl(minioUploader.getPresignedUrl(book.getThumbnailUrl(), bucket));
-            }
-            return BookResponse.from(book, imageUrl);
-        });
-        return PageResponse.from(bookResponses);
+        Page<BookPreviewResponse> response = mapToBookPreviewResponse(books);
+        return PageResponse.from(response);
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getTop5BestSellerBooks() {
-        Page<Book> top5BestSellerBooks = bookRepository.findBestSellerBooks(Pageable.ofSize(5));
-        return PageResponse.from(top5BestSellerBooks.map(MainBookResponse::from));
+    public PageResponse<AdminBookResponse> getAdminBooks(Pageable pageable) {
+        Page<Book> books = bookRepository.findAll(pageable);
+        return PageResponse.from(books.map(b -> AdminBookResponse.from(b, getThumbnailUrl(b))));
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getAllBestSellerBooks(SortType sortType, Pageable pageable) {
+    @Cacheable(value = "books:best-sellers", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
+    public PageResponse<BookPreviewResponse> getBestSellerBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestSellerBooks = bookRepository.findSortedBestSellerBooks(sortType, pageable);
-        Page<MainBookResponse> responses = bestSellerBooks.map(book -> {
-            long reviewCount = reviewRepository.countByOrderBookBookId(book.getId());
-            long likeCount = likeRepository.countByBookId(book.getId());
-            return MainBookResponse.from(book, reviewCount, likeCount);
-        });
-        return PageResponse.from(responses);
+        Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestSellerBooks);
+        return PageResponse.from(response);
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getTop5NewBooks() {
-        Page<Book> top5RecommendedBooks = bookRepository.findAllByOrderByPublishedAtDesc(Pageable.ofSize(5));
-        return PageResponse.from(top5RecommendedBooks.map(MainBookResponse::from));
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getAllNewBooks(SortType sortType, Pageable pageable) {
+    @Cacheable(value = "books:new", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
+    public PageResponse<BookPreviewResponse> getAllNewBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestRecommendedBooks = bookRepository.findSortedNewBooks(sortType, pageable);
-        Page<MainBookResponse> responses = bestRecommendedBooks.map(book -> {
-            long reviewCount = reviewRepository.countByOrderBookBookId(book.getId());
-            long likeCount = likeRepository.countByBookId(book.getId());
-            return MainBookResponse.from(book, reviewCount, likeCount);
-        });
-        return PageResponse.from(responses);
+        Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestRecommendedBooks);
+        return PageResponse.from(response);
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getTop5RecommendedBooks() {
-        Page<Book> top5RecommendedBooks = bookRepository.findRecommendedBooks(Pageable.ofSize(5));
-        return PageResponse.from(top5RecommendedBooks.map(MainBookResponse::from));
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponse<MainBookResponse> getAllRecommendedBooks(SortType sortType, Pageable pageable) {
+    @Cacheable(value = "books:recommended", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
+    public PageResponse<BookPreviewResponse> getAllRecommendedBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestRecommendedBooks = bookRepository.findSortedRecommendedBooks(sortType, pageable);
-        Page<MainBookResponse> responses = bestRecommendedBooks.map(book -> {
-            long reviewCount = reviewRepository.countByOrderBookBookId(book.getId());
-            long likeCount = likeRepository.countByBookId(book.getId());
-            return MainBookResponse.from(book, reviewCount, likeCount);
-        });
-        return PageResponse.from(responses);
+        Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestRecommendedBooks);
+        return PageResponse.from(response);
     }
 
-    public BookResponse createBook(BookCreateRequest request, MultipartFile coverImage) {
+    public BookDetailResponse createBook(BookCreateRequest request, MultipartFile coverImage) {
 
         if (bookRepository.existsByIsbn(request.isbn())) {
             throw new DuplicateIsbnException(request.isbn());
@@ -182,45 +135,57 @@ public class BookService {
             throw new InvalidCategorySelectionException("카테고리는 최대 10개까지만 선택할 수 있습니다.");
         }
 
-        Publisher publisher = publisherRepository.findById(request.publisherId()).orElseThrow(() -> new PublisherNotFoundException(request.publisherId()));
-        String imageUrl = minioUploader.upload(coverImage, bucket);
+        Publisher publisher = publisherRepository.findByName(request.publisher())
+                .orElseGet(() -> publisherRepository.save(Publisher.builder().name(request.publisher()).build()));
+
         Book book = Book.builder()
                 .isbn(request.isbn())
                 .title(request.title())
                 .contents(request.contents())
                 .description(request.description())
+                .publisher(publisher)
                 .publishedAt(request.publishedAt())
                 .originalPrice(request.originalPrice())
                 .salePrice(request.salePrice())
                 .quantity(request.quantity())
-                .status(request.status())
                 .isPackable(request.isPackable())
-                .thumbnailUrl(imageUrl)
-                .publisher(publisher)
+                .totalRating(0L)
+                .reviewCount(0L)
+                .likeCount(0L)
+                .thumbnailUrl(minioService.upload(coverImage, bucket))
+                .status(request.status())
                 .build();
 
-        List<Category> categories = categoryRepository.findAllById(request.categoryIds());
-        validateCategoryDepth(categories);
-        for(Category category : categories) {
-            book.addBookCategory(category);
+        book = bookRepository.save(book);
+
+        for (Category category : categoryRepository.findAllById(request.categoryIds())) {
+            addCategoryToBook(book.getId(), category.getId());
         }
 
-        List<AuthorRoleRequest> authors = request.authors();
-        for(AuthorRoleRequest authorRoleRequest : authors) {
-            Author author = authorRepository.findById(authorRoleRequest.authorId())
-                    .orElseThrow(() -> new AuthorNotFoundException(authorRoleRequest.authorId()));
-            book.addBookAuthor(author, authorRoleRequest.role());
+        for (BookAuthorDto author : request.authors()) {
+            addAuthorToBook(book.getId(), author);
         }
 
-        List<Tag> tags = tagRepository.findAllById(request.tagIds());
-        for(Tag tag : tags) {
-            book.addBookTag(tag);
+        for (String tag : request.tags()) {
+            addTagToBook(book.getId(), tag);
         }
 
-        return BookResponse.from(bookRepository.save(book), imageUrl);
+        List<List<CategoryFlatDto>> categories = getBookCategories(book.getId());
+
+        BookDetailResponse response = BookDetailResponse.from(
+                book,
+                minioService.getPresignedUrl(book.getThumbnailUrl(), bucket),
+                categories,
+                request.authors(),
+                request.tags()
+        );
+
+        bookSearchService.indexBook(new BookDocument(response));
+
+        return response;
     }
 
-    public BookResponse updateBook(Long bookId, BookUpdateRequest request, MultipartFile coverImage) {
+    public BookDetailResponse updateBook(Long bookId, BookUpdateRequest request, MultipartFile coverImage) {
 
         if (request.categoryIds() == null || request.categoryIds().isEmpty()) {
             throw new InvalidCategorySelectionException("최소 한 개 이상의 카테고리를 선택해야 합니다.");
@@ -238,14 +203,14 @@ public class BookService {
             throw new DuplicateIsbnException(request.isbn());
         }
 
-        Publisher publisher = publisherRepository.findById(request.publisherId())
-                .orElseThrow(() -> new PublisherNotFoundException(request.publisherId()));
+        Publisher publisher = publisherRepository.findByName(request.publisher())
+                .orElseGet(() -> publisherRepository.save(Publisher.builder().name(request.publisher()).build()));
 
         // 입력받은 이미지 파일이 없으면 기존 imageUrl로 유지
         String imageUrl = book.getThumbnailUrl();
         if (coverImage != null && !coverImage.isEmpty()) {
-            minioUploader.delete(imageUrl, bucket);
-            imageUrl = minioUploader.upload(coverImage, bucket);
+            minioService.delete(imageUrl, bucket);
+            imageUrl = minioService.upload(coverImage, bucket);
         }
 
         book.updateBook(
@@ -263,58 +228,88 @@ public class BookService {
                 publisher
         );
 
-        book.getBookCategories().clear();
-        book.getBookAuthors().clear();
-        book.getBookTags().clear();
+        bookCategoryRepository.deleteAllByBookId(book.getId());
+        bookAuthorRepository.deleteAllByBookId(book.getId());
+        bookTagRepository.deleteAllByBookId(book.getId());
 
-        List<Long> categoryIds = request.categoryIds();
-        List<Category> categories = categoryRepository.findAllById(categoryIds);
-        validateCategoryDepth(categories);
+        categoryRepository.findAllById(request.categoryIds())
+                .forEach(category -> addCategoryToBook(book.getId(), category.getId()));
+        request.authors().forEach(author -> addAuthorToBook(book.getId(), author));
+        request.tags().forEach(tag -> addTagToBook(book.getId(), tag));
 
-        List<AuthorRoleRequest> authors = request.authors();
-        List<Long> tagIds = request.tagIds();
+        List<List<CategoryFlatDto>> categories = getBookCategories(book.getId());
 
-        // 카테고리 다시 설정
-        for (Long categoryId : categoryIds) {
-            Category category = categoryRepository.findById(categoryId)
-                    .orElseThrow(() -> new CategoryNotFoundException(categoryId));
-            book.addBookCategory(category);
-        }
+        BookDetailResponse response = BookDetailResponse.from(
+                book,
+                getThumbnailUrl(book),
+                categories,
+                request.authors(),
+                request.tags()
+        );
 
-        // 작가 다시 설정
-        for (AuthorRoleRequest authorRoleRequest : authors) {
-            Author author = authorRepository.findById(authorRoleRequest.authorId())
-                    .orElseThrow(() -> new AuthorNotFoundException(authorRoleRequest.authorId()));
-            book.addBookAuthor(author, authorRoleRequest.role()); // 역할 포함
-        }
+        bookSearchService.updateBook(response);
 
-        // 태그 다시 설정
-        for (Long tagId : tagIds) {
-            Tag tag = tagRepository.findById(tagId)
-                    .orElseThrow(() -> new TagNotFoundException(tagId));
-            book.addBookTag(tag);
-        }
-        double averageRating = getAverageRating(bookId);
-        long likeCount = likeRepository.countByBookId(book.getId());
-
-        return BookResponse.from(book, imageUrl, averageRating, likeCount);
+        return response;
     }
 
-    public void deleteBook(@PathVariable Long bookId) {
+    public void deleteBook(Long bookId) {
         Book book = bookRepository.findById(bookId).orElseThrow(
                 () -> new BookNotFoundException(bookId));
 
-        // 도서 삭제 로직 수정 필요 -> 실제 삭제를 하는 것이 아닌 도서의 상태를 "삭제"로 변경
+        book.delete();
+        bookSearchService.deleteBook(bookId);
+    }
 
-        book.getBookCategories().clear();
-        book.getBookAuthors().clear();
-        book.getBookTags().clear();
+    private List<List<CategoryFlatDto>> getBookCategories(long bookId) {
+        List<List<CategoryFlatDto>> categories = new ArrayList<>();
+        bookCategoryRepository.findAllByBookId(bookId).stream()
+                .map(bc -> categoryService.getAllAncestors(bc.getCategory().getId()))
+                .forEach(categories::add);
+        return categories;
+    }
 
-        bookRepository.delete(book);
+    private void addCategoryToBook(Long bookId, Long categoryId) {
+        Book book = bookRepository.findById(bookId).orElseThrow(() -> new BookNotFoundException(bookId));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new CategoryNotFoundException(categoryId));
+        if (category.getDepth() < 1) {
+            return;
+        }
+        bookCategoryRepository.save(new BookCategory(book, category));
+    }
+
+    private List<BookAuthorDto> getBookAuthors(long bookId) {
+        return bookAuthorRepository.findAllByBookId(bookId).stream()
+                .map(ba -> new BookAuthorDto(ba.getAuthor().getName(), ba.getRole()))
+                .toList();
+    }
+
+    private void addAuthorToBook(Long bookId, BookAuthorDto dto) {
+        Book book = bookRepository.findById(bookId).orElseThrow(() -> new BookNotFoundException(bookId));
+        Author author = authorRepository.findByName(dto.name())
+                .orElseGet(() -> authorRepository.save(Author.builder().name(dto.name()).build()));
+
+        BookAuthor bookAuthor = new BookAuthor(book, author, dto.role());
+        bookAuthorRepository.save(bookAuthor);
+    }
+
+    private List<String> getBookTags(long bookId) {
+        return bookTagRepository.findAllByBookId(bookId).stream()
+                .map(bt -> bt.getTag().getName())
+                .toList();
+    }
+
+    private void addTagToBook(Long bookId, String tagName) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookNotFoundException(bookId));
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+        BookTag bookTag = new BookTag(book, tag);
+        bookTagRepository.save(bookTag);
     }
 
     // 알라딘 api + 자체적으로 조정할 내용 입력하여 도서 등록
-    public BookResponse registerBookByAladin(BookRegisterRequest request) {
+    public BookDetailResponse registerBookByAladin(BookRegisterRequest request) {
         AladinBookResponse dto = request.aladinBookResponse();
         if (bookRepository.existsByIsbn(dto.isbn13())) {
             throw new DuplicateIsbnException(dto.isbn13());
@@ -324,130 +319,95 @@ public class BookService {
                 .orElseGet(() -> publisherRepository.save(Publisher.builder().name(dto.publisher()).build()));
 
         Book book = Book.builder()
+                .isbn(dto.isbn13())
                 .title(dto.title())
+                .contents(request.contents())
                 .description(dto.description())
-                .contents(dto.toc())
                 .publisher(publisher)
                 .publishedAt(LocalDate.parse(dto.pubDate()))
-                .isbn(dto.isbn13())
                 .originalPrice(dto.priceStandard())
                 .salePrice(request.priceSales())
                 .quantity(request.quantity())
-                .status(request.status())
                 .isPackable(request.isPackable())
+                .totalRating(0L)
+                .reviewCount(0L)
+                .likeCount(0L)
                 .thumbnailUrl(dto.cover())
+                .status(request.status())
                 .build();
+
         bookRepository.save(book); // 먼저 저장해서 ID 확보
 
-        List<AuthorDto> authorDtos = parseAuthors(dto.author());
-        for (AuthorDto authorDto : authorDtos) {
-            Author author = authorRepository.findByName(authorDto.authorName())
-                    .orElseGet(() -> authorRepository.save(Author.builder().name(authorDto.authorName()).build()));
-            book.addBookAuthor(author, authorDto.role());
+        List<List<CategoryFlatDto>> categories = categoryService.createCategoryHierarchy(dto.categoryName());
+        for (List<CategoryFlatDto> path : categories) {
+            CategoryFlatDto selectedCategory = path.getLast();
+            addCategoryToBook(book.getId(), selectedCategory.id());
         }
 
-        Category category = createCategoryHierarchy(dto.categoryName());
-        book.addBookCategory(category);
+        List<BookAuthorDto> authors = parseAuthors(dto.author());
+        authors.forEach(author -> addAuthorToBook(book.getId(), author));
 
-        List<Long> tagIds = request.tagIds();
-        if (tagIds != null && !tagIds.isEmpty()) {
-            List<Tag> tags = tagRepository.findAllById(tagIds);
-            for (Tag tag : tags) {
-                book.addBookTag(tag);
-            }
+        if (request.tags() != null) {
+            request.tags().forEach(tag -> addTagToBook(book.getId(), tag));
         }
 
-        return BookResponse.from(book, book.getThumbnailUrl());
+        BookDetailResponse response = BookDetailResponse.from(
+                book,
+                book.getThumbnailUrl(),
+                categories,
+                authors,
+                request.tags()
+        );
+
+        bookSearchService.indexBook(new BookDocument(response));
+
+        return response;
     }
 
-    private double getAverageRating(Long bookId) {
-        return reviewRepository.findAverageRatingByBookId(bookId)
-                .orElse(0.0);
-    }
-    // 카테고리는 최소 2단계
-
-    private void validateCategoryDepth(List<Category> categories) {
-        for (Category category : categories) {
-            if (category.getParent() == null) {
-                throw new InvalidCategoryDepthException();
-            }
-        }
-    }
-    // 알라딘 API로 가져온 작가 이름 파싱
-
-    public List<AuthorDto> parseAuthors(String authorString) {
-        List<String> parts = Arrays.stream(authorString.split(","))
+    public List<BookAuthorDto> parseAuthors(String rawAuthors) {
+        List<String> parts = Arrays.stream(rawAuthors.split(","))
                 .map(String::trim)
                 .toList();
 
-        List<AuthorDto> result = new ArrayList<>(Collections.nCopies(parts.size(), null));
+        List<BookAuthorDto> result = new ArrayList<>();
 
         Pattern pattern = Pattern.compile("^(.*)\\(([^()]+)\\)$");
         String currentRole = null;
         for (int i = parts.size() - 1; i >= 0; i--) {
             String part = parts.get(i);
             Matcher matcher = pattern.matcher(part);
+
+            String name;
+            String role;
+
             if (matcher.matches()) {
-                String nameWithPossibleParens = matcher.group(1).trim();
+                name = matcher.group(1).trim();
                 currentRole = matcher.group(2).trim();
-                Author author = authorRepository.findByName(nameWithPossibleParens).orElseThrow(() -> new AuthorNotFoundException(nameWithPossibleParens));
-                result.set(i, new AuthorDto(author.getId(),nameWithPossibleParens, currentRole));
+                role = currentRole;
             } else {
-                Author author = authorRepository.findByName(part).orElseThrow(() -> new AuthorNotFoundException(part));
-                result.set(i, new AuthorDto(author.getId(), part, currentRole != null ? currentRole : "지은이"));
+                name = part;
+                role = (currentRole != null) ? currentRole : "지은이";
             }
+            result.add(new BookAuthorDto(name, role));
         }
         return result;
     }
-    // 알라딘 api에서 가져온 카테고리 이름 분리 > 계층 구조 생성 (국내도서>소설/시/희곡/한국소설)
 
-    public Category createCategoryHierarchy(String categoryPath) {
-        String[] categoryNames = categoryPath.split(">");
-        Category parent = null;
-
-        for (String name : categoryNames) {
-            name = name.trim();
-
-            // 이름으로 카테고리 존재 여부 확인
-            String finalName = name;
-            Category finalParent = parent;
-
-            parent = categoryRepository.findByName(name)
-                    .orElseGet(() -> {
-                        Category newCategory = Category.builder()
-                                .name(finalName)
-                                .parent(finalParent)
-                                .build();
-                        return categoryRepository.save(newCategory);
-                    });
-        }
-        return parent;
-    }
-  
-    @Transactional(readOnly = true)
-    public PageResponse<BookResponse> getBooksByCategory(String categoryName, Pageable pageable) {
-        // 1. 카테고리 엔티티 조회
-        Category category = categoryRepository.findByName(categoryName)
-                .orElseThrow(() -> new CategoryNotFoundException(categoryName));
-
-        // 2. 자기 자신 포함 하위 카테고리 ID 전체 조회
-        List<Category> allCategories = categoryRepository.findAllDescendantsIncludingSelf(category.getId());
-        List<Long> categoryIds = allCategories.stream()
-                .map(Category::getId)
-                .toList();
-
-        // 3. 책 목록 조회
-        Page<Book> books = bookRepository.findByCategoryIds(categoryIds, pageable);
-
-        // 4. 이미지 URL 가공 및 DTO 변환
-        Page<BookResponse> bookResponses = books.map(book -> {
-            String imageUrl = book.getThumbnailUrl();
-            if (imageUrl != null && !imageUrl.startsWith("https")) {
-                imageUrl = presignUrlPrefixUtil.addPrefixUrl(minioUploader.getPresignedUrl(book.getThumbnailUrl(), bucket));
-            }
-            return BookResponse.from(book, imageUrl);
+    private Page<BookPreviewResponse> mapToBookPreviewResponse(Page<Book> books) {
+        return books.map(book -> {
+            List<String> authors = bookAuthorRepository.findAllByBookId(book.getId()).stream()
+                    .map(ba -> "%s (%s)".formatted(ba.getAuthor().getName(), ba.getRole()))
+                    .toList();
+            return BookPreviewResponse.from(
+                    book,
+                    getThumbnailUrl(book),
+                    authors
+            );
         });
+    }
 
-        return PageResponse.from(bookResponses);
+    private String getThumbnailUrl(Book book) {
+        return book.getThumbnailUrl().startsWith("https") ? book.getThumbnailUrl()
+                : minioService.getPresignedUrl(book.getThumbnailUrl(), bucket);
     }
 }

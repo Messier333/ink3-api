@@ -8,6 +8,7 @@ public record PointPolicyResponse(
         String name,
         Integer joinPoint,
         Integer reviewPoint,
+        Integer imageReviewPoint,
         Integer defaultRate,
         Boolean isActive,
         LocalDateTime createdAt
@@ -18,6 +19,7 @@ public record PointPolicyResponse(
                 pointPolicy.getName(),
                 pointPolicy.getJoinPoint(),
                 pointPolicy.getReviewPoint(),
+                pointPolicy.getImageReviewPoint(),
                 pointPolicy.getDefaultRate(),
                 pointPolicy.getIsActive(),
                 pointPolicy.getCreatedAt()

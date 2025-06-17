@@ -4,6 +4,7 @@ public record PointPolicyCreateRequest(
         String name,
         Integer joinPoint,
         Integer reviewPoint,
+        Integer imageReviewPoint,
         Integer defaultRate
 ) {
 }

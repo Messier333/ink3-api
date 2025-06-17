@@ -27,7 +27,7 @@ import shop.ink3.api.user.user.entity.User;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_social_provider_provider_user_id",
-                        columnNames = {"provider", "provider_user_id"}
+                        columnNames = {"provider", "provider_id"}
                 )
         }
 )

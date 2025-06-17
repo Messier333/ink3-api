@@ -7,7 +7,9 @@ import java.lang.annotation.*;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-@Constraint(validatedBy = OriginIdRequiredValidator.class)
+@Constraint(validatedBy = {
+        OriginIdRequiredValidator.class,
+        CommonOriginIdRequiredValidator.class})
 @Documented
 public @interface ValidOriginId {
     String message() default "originId는 BOOK 또는 CATEGORY 타입일 때 필수입니다.";

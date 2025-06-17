@@ -55,7 +55,6 @@ class ShippingPolicyServiceTest {
         assertNotNull(response);
         assertEquals("테스트", response.getName());
         assertEquals(3000, response.getFee());
-        assertFalse(response.getIsAvailable());
     }
 
     @Test
@@ -201,17 +200,6 @@ class ShippingPolicyServiceTest {
 
         // then
         assertEquals(response.getName(),"테스트1");
-    }
-
-    @Test
-    @DisplayName("현재 배송 정책 확인 - 실패")
-    void checkShippingPolicy_실패() {
-        // given
-        when(shippingPolicyRepository.findByIsAvailableTrue()).thenReturn(Optional.empty());
-
-        // when, then
-        assertThrows(ShippingPolicyNotFoundException.class,
-                () -> shippingPolicyService.getActivateShippingPolicy());
     }
 
     @Test

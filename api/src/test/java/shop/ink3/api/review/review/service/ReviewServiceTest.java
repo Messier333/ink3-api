@@ -21,9 +21,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import shop.ink3.api.book.book.entity.Book;
+import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
-import shop.ink3.api.common.uploader.MinioUploader;
-import shop.ink3.api.common.util.PresignUrlPrefixUtil;
+import shop.ink3.api.common.uploader.MinioService;
+import shop.ink3.api.elastic.service.BookSearchService;
 import shop.ink3.api.order.order.entity.Order;
 import shop.ink3.api.order.orderBook.entity.OrderBook;
 import shop.ink3.api.order.orderBook.repository.OrderBookRepository;
@@ -40,6 +41,8 @@ import shop.ink3.api.review.reviewImage.repository.ReviewImageRepository;
 import shop.ink3.api.user.point.history.entity.PointHistory;
 import shop.ink3.api.user.point.history.entity.PointHistoryStatus;
 import shop.ink3.api.user.point.history.service.PointService;
+import shop.ink3.api.user.point.policy.dto.PointPolicyResponse;
+import shop.ink3.api.user.point.policy.service.PointPolicyService;
 import shop.ink3.api.user.user.entity.User;
 import shop.ink3.api.user.user.repository.UserRepository;
 
@@ -47,6 +50,9 @@ class ReviewServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private BookRepository bookRepository;
 
     @Mock
     private OrderBookRepository orderBookRepository;
@@ -61,13 +67,16 @@ class ReviewServiceTest {
     private PointService pointService;
 
     @Mock
-    private MinioUploader minioUploader;
+    private PointPolicyService pointPolicyService;
 
     @Mock
-    private PresignUrlPrefixUtil presignUrlPrefixUtil;
+    private MinioService minioService;
 
     @InjectMocks
     private ReviewService reviewService;
+
+    @Mock
+    private BookSearchService bookSearchService;
 
     private User user;
     private Order order;
@@ -78,12 +87,31 @@ class ReviewServiceTest {
         MockitoAnnotations.openMocks(this);
         user = User.builder().id(1L).name("user1").build();
         order = Order.builder().id(1L).user(user).build();
+        Book book = Book.builder()
+            .id(1L)
+            .totalRating(0L)
+            .reviewCount(0L)
+            .likeCount(0L)
+            .build();
+
         orderBook = OrderBook.builder()
             .id(1L)
-            .book(Book.builder().id(1L).build())
+            .book(book)
             .order(order)
             .build();
-        ReflectionTestUtils.setField(reviewService, "bucket", "test-bucket");
+
+        when(pointPolicyService.getPointPolicy(anyLong())).thenReturn(
+            new PointPolicyResponse(
+                1L,
+                "기본정책",
+                100,
+                200,
+                300,
+                5,
+                true,
+                LocalDateTime.now()
+            )
+        );
 
         when(pointService.earnPoint(anyLong(), any())).thenReturn(
             PointHistory.builder()
@@ -95,6 +123,8 @@ class ReviewServiceTest {
                 .createdAt(LocalDateTime.now())
                 .build()
         );
+
+        ReflectionTestUtils.setField(reviewService, "bucket", "test-bucket");
     }
 
     @Test
@@ -119,6 +149,58 @@ class ReviewServiceTest {
     }
 
     @Test
+    @DisplayName("리뷰 등록 실패 - 사용자 없음")
+    void addReviewFail_userNotFound() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        ReviewRequest request = new ReviewRequest(1L, 1L, "제목", "내용", 5);
+
+        assertThatThrownBy(() -> reviewService.addReview(request, List.of()))
+            .isInstanceOf(shop.ink3.api.user.user.exception.UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("리뷰 등록 실패 - 주문 도서 없음")
+    void addReviewFail_orderBookNotFound() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(orderBookRepository.findById(1L)).thenReturn(Optional.empty());
+
+        ReviewRequest request = new ReviewRequest(1L, 1L, "제목", "내용", 5);
+
+        assertThrows(shop.ink3.api.order.orderBook.exception.OrderBookNotFoundException.class,
+            () -> reviewService.addReview(request, List.of()));
+    }
+
+    @Test
+    @DisplayName("리뷰 등록 실패 - 본인의 주문이 아님")
+    void addReviewFail_unauthorizedUser() {
+        User anotherUser = User.builder().id(999L).build();
+        Order anotherOrder = Order.builder().id(2L).user(anotherUser).build();
+        OrderBook anotherOrderBook = OrderBook.builder().id(1L).order(anotherOrder).build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(orderBookRepository.findById(1L)).thenReturn(Optional.of(anotherOrderBook));
+
+        ReviewRequest request = new ReviewRequest(1L, 1L, "제목", "내용", 5);
+
+        assertThrows(shop.ink3.api.review.review.exception.UnauthorizedOrderBookAccessException.class,
+            () -> reviewService.addReview(request, List.of()));
+    }
+
+    @Test
+    @DisplayName("리뷰 등록 실패 - 이미 리뷰 존재")
+    void addReviewFail_duplicate() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(orderBookRepository.findById(1L)).thenReturn(Optional.of(orderBook));
+        when(reviewRepository.existsByOrderBookId(1L)).thenReturn(true);
+
+        ReviewRequest request = new ReviewRequest(1L, 1L, "제목", "내용", 5);
+
+        assertThrows(shop.ink3.api.review.review.exception.ReviewAlreadyRegisterException.class,
+            () -> reviewService.addReview(request, List.of()));
+    }
+
+    @Test
     @DisplayName("리뷰 수정")
     void updateReview() {
         Review review = new Review(user, orderBook, "제목", "내용", 3);
@@ -128,7 +210,7 @@ class ReviewServiceTest {
 
         when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
         when(reviewImageRepository.findByReviewId(1L)).thenReturn(List.of());
-        when(minioUploader.upload(any(MultipartFile.class), anyString())).thenReturn("new-image.jpg");
+        when(minioService.upload(any(MultipartFile.class), anyString())).thenReturn("new-image.jpg");
 
         ReviewResponse response = reviewService.updateReview(1L, request, List.of(mock(MultipartFile.class)), 1L);
 
@@ -139,7 +221,8 @@ class ReviewServiceTest {
     @Test
     @DisplayName("도서 ID로 리뷰 목록 조회")
     void getReviewsByBookId() {
-        ReviewDefaultListResponse dto = new ReviewDefaultListResponse(1L, 1L, 1L, 1L, "user1", "제목", "내용", 5, null, null);
+        ReviewDefaultListResponse dto = new ReviewDefaultListResponse(1L, 1L, 1L, 1L, "user1", "제목", "내용", 5, null,
+            null);
         Page<ReviewDefaultListResponse> page = new PageImpl<>(List.of(dto));
 
         Review review = new Review(user, orderBook, "제목", "내용", 5);
@@ -152,10 +235,8 @@ class ReviewServiceTest {
 
         when(reviewRepository.findListByBookId(any(), anyLong())).thenReturn(page);
         when(reviewImageRepository.findByReviewIdIn(List.of(1L))).thenReturn(List.of(image));
-        when(minioUploader.getPresignedUrl(anyString(), anyString()))
+        when(minioService.getPresignedUrl(anyString(), anyString()))
             .thenReturn("http://storage.java21.net:8000/ink3-dev-reviews-images/sample.jpg");
-        when(presignUrlPrefixUtil.addPrefixUrl(anyString()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
 
         PageResponse<ReviewListResponse> response = reviewService.getReviewsByBookId(PageRequest.of(0, 10), 1L);
 
@@ -181,10 +262,8 @@ class ReviewServiceTest {
 
         when(reviewRepository.findListByUserId(any(), anyLong())).thenReturn(page);
         when(reviewImageRepository.findByReviewIdIn(List.of(1L))).thenReturn(List.of(image));
-        when(minioUploader.getPresignedUrl(anyString(), anyString()))
+        when(minioService.getPresignedUrl(anyString(), anyString()))
             .thenReturn("http://storage.java21.net:8000/ink3-dev-reviews-images/sample.jpg");
-        when(presignUrlPrefixUtil.addPrefixUrl(anyString()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
 
         PageResponse<ReviewListResponse> response = reviewService.getReviewsByUserId(PageRequest.of(0, 10), 1L);
 

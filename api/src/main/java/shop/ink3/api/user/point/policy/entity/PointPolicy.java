@@ -20,10 +20,11 @@ import lombok.NoArgsConstructor;
 public class PointPolicy {
 
     @Builder
-    public PointPolicy(String name, int joinPoint, int reviewPoint, int defaultRate) {
+    public PointPolicy(String name, int joinPoint, int reviewPoint, int imageReviewPoint, int defaultRate) {
         this.name = name;
         this.joinPoint = joinPoint;
         this.reviewPoint = reviewPoint;
+        this.imageReviewPoint = imageReviewPoint;
         this.defaultRate = defaultRate;
         this.isActive = false;
     }
@@ -42,6 +43,9 @@ public class PointPolicy {
     private Integer reviewPoint;
 
     @Column(nullable = false)
+    private Integer imageReviewPoint;
+
+    @Column(nullable = false)
     private Integer defaultRate;
 
     @Column(nullable = false)
@@ -55,10 +59,11 @@ public class PointPolicy {
         this.createdAt = LocalDateTime.now();
     }
 
-    public void update(String name, int joinPoint, int reviewPoint, int defaultRate) {
+    public void update(String name, int joinPoint, int reviewPoint, int imageReviewPoint, int defaultRate) {
         this.name = name;
         this.joinPoint = joinPoint;
         this.reviewPoint = reviewPoint;
+        this.imageReviewPoint = imageReviewPoint;
         this.defaultRate = defaultRate;
     }
 

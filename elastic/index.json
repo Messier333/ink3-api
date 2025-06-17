@@ -1,0 +1,81 @@
+//PUT /ink3_books_dev
+{
+  "settings": {
+    "analysis": {
+      "tokenizer": {
+        "nori_mixed_tokenizer": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "mixed"
+        }
+      },
+      "analyzer": {
+        "nori_mixed": {
+          "type": "custom",
+          "tokenizer": "nori_mixed_tokenizer",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "long"
+      },
+      "isbn": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "nori_mixed"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "nori_mixed"
+      },
+      "authors": {
+        "type": "text",
+        "analyzer": "nori_mixed"
+      },
+      "publisher": {
+        "type": "text",
+        "analyzer": "nori_mixed"
+      },
+      "publishedAt": {
+        "type": "date"
+      },
+      "categories": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "text",
+        "analyzer": "nori_mixed",
+        "fields": {
+          "raw": {
+            "type": "keyword"
+          }
+        }
+      },
+      "price": {
+        "type": "integer"
+      },
+      "rating": {
+        "type": "double"
+      },
+      "reviewCount": {
+        "type": "long"
+      },
+      "viewCount": {
+        "type": "long"
+      },
+      "searchCount": {
+        "type": "long"
+      },
+      "popularityScore": {
+        "type": "long"
+      }
+    }
+  }
+}

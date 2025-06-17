@@ -1,5 +1,6 @@
 package shop.ink3.api.payment.controller;
 
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +16,12 @@ import shop.ink3.api.common.dto.CommonResponse;
 import shop.ink3.api.order.order.dto.OrderStatusUpdateRequest;
 import shop.ink3.api.order.order.entity.OrderStatus;
 import shop.ink3.api.order.order.service.OrderService;
+import shop.ink3.api.payment.dto.PaymentCancelRequest;
 import shop.ink3.api.payment.dto.PaymentConfirmRequest;
 import shop.ink3.api.payment.dto.PaymentResponse;
 import shop.ink3.api.payment.dto.ZeroPaymentRequest;
 import shop.ink3.api.payment.entity.PaymentType;
+import shop.ink3.api.payment.exception.PaymentKeyNotExistsException;
 import shop.ink3.api.payment.service.PaymentService;
 
 @Slf4j
@@ -27,26 +30,17 @@ import shop.ink3.api.payment.service.PaymentService;
 @RequestMapping("/payments")
 public class PaymentController {
     private final PaymentService paymentService;
-    private final OrderService orderService;
 
     // 결제 승인 API 호출 및 결과 저장
     @PostMapping("/confirm")
     public ResponseEntity<CommonResponse<PaymentResponse>> confirmPayment(
             @RequestBody PaymentConfirmRequest confirmRequest) {
-        log.info("payType={}", confirmRequest.paymentType());
+        if(!confirmRequest.paymentType().equals(PaymentType.POINT) && Objects.isNull(confirmRequest.paymentKey())) {
+                throw new PaymentKeyNotExistsException(confirmRequest.orderId());
+        }
         String paymentApproveResponse = paymentService.callPaymentAPI(confirmRequest);
         PaymentResponse paymentResponse = paymentService.createPayment(confirmRequest, paymentApproveResponse);
         return ResponseEntity.ok(CommonResponse.success(paymentResponse));
-    }
-
-    // 결제 생성 (0원 결제 시 사용)
-    @PostMapping
-    public ResponseEntity<CommonResponse<PaymentResponse>> createPayment(
-            @RequestBody ZeroPaymentRequest zeroPaymentRequest) {
-        log.info("payType={}", PaymentType.POINT);
-        PaymentResponse zeroPayment = paymentService.createZeroPayment(zeroPaymentRequest);
-        orderService.updateOrderStatus(zeroPayment.orderId(), new OrderStatusUpdateRequest(OrderStatus.CONFIRMED));
-        return ResponseEntity.ok(CommonResponse.success(zeroPayment));
     }
 
     // 결제 실패 처리 (회원)
@@ -62,8 +56,9 @@ public class PaymentController {
     @PostMapping("/{orderId}/cancel")
     public ResponseEntity<CommonResponse<Void>> cancelPayment(
             @PathVariable long orderId,
-            @RequestHeader("X-User-Id") long userId) {
-        paymentService.cancelPayment(orderId, userId);
+            @RequestHeader("X-User-Id") long userId,
+            @RequestBody PaymentCancelRequest cancelRequest) {
+        paymentService.cancelPayment(orderId, userId, cancelRequest);
         return ResponseEntity.noContent().build();
     }
 

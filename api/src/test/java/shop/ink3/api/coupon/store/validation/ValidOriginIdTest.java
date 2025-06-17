@@ -6,6 +6,7 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import shop.ink3.api.coupon.store.dto.CommonCouponIssueRequest;
 import shop.ink3.api.coupon.store.dto.CouponIssueRequest;
 import shop.ink3.api.coupon.store.entity.OriginType;
 
@@ -27,7 +28,6 @@ public class ValidOriginIdTest {
     void bookType() {
         CouponIssueRequest request = new CouponIssueRequest(
                 1L,
-                1L,
                 OriginType.BOOK,
                 null // originId 없음
         );
@@ -43,7 +43,6 @@ public class ValidOriginIdTest {
     void categoryType() {
         CouponIssueRequest request = new CouponIssueRequest(
                 1L,
-                1L,
                 OriginType.CATEGORY,
                 null
         );
@@ -57,28 +56,28 @@ public class ValidOriginIdTest {
 
     @Test
     void welcomeType() {
-        CouponIssueRequest request = new CouponIssueRequest(
+        CommonCouponIssueRequest request = new CommonCouponIssueRequest(
                 1L,
                 1L,
                 OriginType.WELCOME,
                 null
         );
 
-        Set<ConstraintViolation<CouponIssueRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<CommonCouponIssueRequest>> violations = validator.validate(request);
 
         assertThat(violations).isEmpty();
     }
 
     @Test
     void birthdayType() {
-        CouponIssueRequest request = new CouponIssueRequest(
+        CommonCouponIssueRequest request = new CommonCouponIssueRequest(
                 1L,
                 1L,
                 OriginType.BIRTHDAY,
                 null
         );
 
-        Set<ConstraintViolation<CouponIssueRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<CommonCouponIssueRequest>> violations = validator.validate(request);
 
         assertThat(violations).isEmpty();
     }
@@ -86,7 +85,6 @@ public class ValidOriginIdTest {
     @Test
     void bookTypeSuccess() {
         CouponIssueRequest request = new CouponIssueRequest(
-                1L,
                 1L,
                 OriginType.BOOK,
                 99L

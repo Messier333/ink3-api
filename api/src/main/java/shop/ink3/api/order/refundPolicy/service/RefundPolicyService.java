@@ -28,11 +28,15 @@ public class RefundPolicyService {
                 .name(request.getName())
                 .returnDeadLine(request.getReturnDeadLine())
                 .defectReturnDeadLine(request.getDefectReturnDeadLine())
-                .isAvailable(false)
+                .isAvailable(true)
                 .createdAt(LocalDateTime.now())
                 .refundShippingFee(request.getRefundShippingFee())
                 .build();
 
+        RefundPolicyResponse availableRefundPolicy = getAvailableRefundPolicy();
+        if(availableRefundPolicy != null) {
+            deactivate(availableRefundPolicy.getId());
+        }
         return RefundPolicyResponse.from(refundPolicyRepository.save(refundPolicy));
     }
 
@@ -51,10 +55,13 @@ public class RefundPolicyService {
         return PageResponse.from(responsePage);
     }
 
-    // 활성화된 정책 list 조회
+    // 활성화된 정책 조회
     @Transactional(readOnly = true)
     public RefundPolicyResponse getAvailableRefundPolicy() {
         RefundPolicy refundPolicy = refundPolicyRepository.findByIsAvailableTrue();
+        if(refundPolicy == null) {
+            return null;
+        }
         return RefundPolicyResponse.from(refundPolicy);
     }
 
@@ -73,6 +80,10 @@ public class RefundPolicyService {
 
     // 활성화
     public void activate(long refundPolicyId) {
+        RefundPolicyResponse availableRefundPolicy = getAvailableRefundPolicy();
+        if(availableRefundPolicy != null) {
+            deactivate(availableRefundPolicy.getId());
+        }
         RefundPolicy refundPolicy = getRefundPolicyOrThrow(refundPolicyId);
         refundPolicy.activate();
         refundPolicyRepository.save(refundPolicy);

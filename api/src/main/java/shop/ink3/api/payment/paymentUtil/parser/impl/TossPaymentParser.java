@@ -19,55 +19,39 @@ import shop.ink3.api.payment.paymentUtil.parser.PaymentParser;
 @RequiredArgsConstructor
 @Component("TOSS-PARSER")
 public class TossPaymentParser implements PaymentParser {
-    private final OrderRepository orderRepository;
     private static final String PAYMENT_METHOD = "TOSS";
+    private final OrderRepository orderRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
-    public Payment paymentResponseParser(PaymentConfirmRequest paymentConfirmRequest, String json) {
-        try{
-            ObjectMapper objectMapper = new ObjectMapper()
-                    .registerModule(new JavaTimeModule())
-                    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-            TossPaymentResponse tossResponse = objectMapper.readValue(json, TossPaymentResponse.class);
-            Order order = orderRepository.findById(paymentConfirmRequest.orderId())
-                    .orElseThrow(()->new OrderNotFoundException(paymentConfirmRequest.orderId()));
-
-            return Payment.builder()
-                    .order(order)
-                    .paymentKey(tossResponse.paymentKey())
-                    .usedPoint(paymentConfirmRequest.usedPointAmount())
-                    .discountPrice(paymentConfirmRequest.discountAmount())
-                    .paymentAmount(tossResponse.totalAmount())
-                    .paymentType(PaymentType.TOSS)
-                    .requestAt(tossResponse.requestedAt().toLocalDateTime())
-                    .approvedAt(tossResponse.approvedAt().toLocalDateTime())
-                    .build();
-        }  catch (Exception e) {
-            throw new PaymentParserFailException(PAYMENT_METHOD, e);
-        }
+    public Payment paymentResponseParser(PaymentConfirmRequest request, String json) {
+        return createPayment(request.orderId(), request.usedPointAmount(), request.discountAmount(), json);
     }
 
     @Override
-    public Payment paymentResponseParser(GuestPaymentConfirmRequest paymentConfirmRequest, String json) {
-        try{
-            ObjectMapper objectMapper = new ObjectMapper()
-                    .registerModule(new JavaTimeModule())
-                    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    public Payment paymentResponseParser(GuestPaymentConfirmRequest request, String json) {
+        return createPayment(request.orderId(), 0, 0, json);
+    }
+
+    private Payment createPayment(long orderId, int usedPoint, int discountPrice, String json) {
+        try {
             TossPaymentResponse tossResponse = objectMapper.readValue(json, TossPaymentResponse.class);
-            Order order = orderRepository.findById(paymentConfirmRequest.orderId())
-                    .orElseThrow(()->new OrderNotFoundException(paymentConfirmRequest.orderId()));
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new OrderNotFoundException(orderId));
 
             return Payment.builder()
                     .order(order)
                     .paymentKey(tossResponse.paymentKey())
-                    .usedPoint(0)
-                    .discountPrice(0)
+                    .usedPoint(usedPoint)
+                    .discountPrice(discountPrice)
                     .paymentAmount(tossResponse.totalAmount())
                     .paymentType(PaymentType.TOSS)
                     .requestAt(tossResponse.requestedAt().toLocalDateTime())
                     .approvedAt(tossResponse.approvedAt().toLocalDateTime())
                     .build();
-        }  catch (Exception e) {
+        } catch (Exception e) {
             throw new PaymentParserFailException(PAYMENT_METHOD, e);
         }
     }

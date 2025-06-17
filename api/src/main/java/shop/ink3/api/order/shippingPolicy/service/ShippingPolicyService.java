@@ -1,6 +1,7 @@
 package shop.ink3.api.order.shippingPolicy.service;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,10 +29,13 @@ public class ShippingPolicyService {
                 .name(request.getName())
                 .threshold(request.getThreshold())
                 .fee(request.getFee())
-                .isAvailable(false)
+                .isAvailable(true)
                 .createdAt(LocalDateTime.now())
                 .build();
-
+        ShippingPolicyResponse activateShippingPolicy = getActivateShippingPolicy();
+        if(Objects.nonNull(activateShippingPolicy)) {
+            deactivate(activateShippingPolicy.getId());
+        }
         return ShippingPolicyResponse.from(shippingPolicyRepository.save(shippingPolicy));
     }
 
@@ -47,7 +51,7 @@ public class ShippingPolicyService {
     public PageResponse<ShippingPolicyResponse> getShippingPolicyList(Pageable pageable) {
         Page<ShippingPolicy> page = shippingPolicyRepository.findAll(pageable);
         Page<ShippingPolicyResponse> pageResponse = page.map(
-                shippingPolicy -> ShippingPolicyResponse.from(shippingPolicy));
+                ShippingPolicyResponse::from);
         return PageResponse.from(pageResponse);
     }
 
@@ -55,10 +59,7 @@ public class ShippingPolicyService {
     @Transactional(readOnly = true)
     public ShippingPolicyResponse getActivateShippingPolicy() {
         Optional<ShippingPolicy> optionalShippingPolicy = shippingPolicyRepository.findByIsAvailableTrue();
-        if (!optionalShippingPolicy.isPresent()) {
-            throw new ShippingPolicyNotFoundException();
-        }
-        return ShippingPolicyResponse.from(optionalShippingPolicy.get());
+        return optionalShippingPolicy.map(ShippingPolicyResponse::from).orElse(null);
     }
 
     // 수정
@@ -84,6 +85,10 @@ public class ShippingPolicyService {
 
     // 특정 배송정책 활성화
     public void activate(long shippingPolicyId) {
+        ShippingPolicyResponse activateShippingPolicy = getActivateShippingPolicy();
+        if(Objects.nonNull(activateShippingPolicy)) {
+            deactivate(activateShippingPolicy.getId());
+        }
         ShippingPolicy shippingPolicy = getShippingPolicyOrThrow(shippingPolicyId);
         shippingPolicy.activate();
         shippingPolicyRepository.save(shippingPolicy);
@@ -92,7 +97,7 @@ public class ShippingPolicyService {
     // 조회 로직
     protected ShippingPolicy getShippingPolicyOrThrow(long shippingPolicyId) {
         Optional<ShippingPolicy> optionalShippingPolicy = shippingPolicyRepository.findById(shippingPolicyId);
-        if (!optionalShippingPolicy.isPresent()) {
+        if (optionalShippingPolicy.isEmpty()) {
             throw new ShippingPolicyNotFoundException();
         }
         return optionalShippingPolicy.get();

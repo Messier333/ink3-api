@@ -1,13 +1,18 @@
 package shop.ink3.api.order.cart.controller;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,9 +22,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.entity.BookStatus;
 import shop.ink3.api.book.publisher.entity.Publisher;
@@ -51,68 +53,66 @@ class CartControllerTest {
     @BeforeEach
     void setUp() {
         user = User.builder()
-            .id(1L)
-            .loginId("test")
-            .name("test")
-            .email("test@test.com")
-            .phone("010-1234-5678")
-            .birthday(LocalDate.of(2025, 1, 1))
-            .point(1000)
-            .status(UserStatus.ACTIVE)
-            .lastLoginAt(LocalDateTime.now())
-            .createdAt(LocalDateTime.now())
-            .build();
+                .id(1L)
+                .loginId("test")
+                .name("test")
+                .email("test@test.com")
+                .phone("010-1234-5678")
+                .birthday(LocalDate.of(2025, 1, 1))
+                .point(1000)
+                .status(UserStatus.ACTIVE)
+                .lastLoginAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .build();
 
         publisher = Publisher.builder()
-            .id(1L)
-            .name("출판사1")
-            .build();
+                .id(1L)
+                .name("출판사1")
+                .build();
 
         book1 = Book.builder()
-            .id(1L)
-            .isbn("1234567890123")
-            .title("예제 책 제목")
-            .contents("책 내용 요약")
-            .description("책 상세 설명")
-            .publishedAt(LocalDate.of(2024, 1, 1))
-            .originalPrice(20000)
-            .salePrice(18000)
-            .discountRate((18000 * 100) / 20000)
-            .quantity(100)
-            .status(BookStatus.AVAILABLE)
-            .isPackable(true)
-            .thumbnailUrl("https://example.com/image.jpg")
-            .publisher(publisher)
-            .build();
+                .id(1L)
+                .isbn("1234567890123")
+                .title("예제 책 제목")
+                .contents("책 내용 요약")
+                .description("책 상세 설명")
+                .publishedAt(LocalDate.of(2024, 1, 1))
+                .originalPrice(20000)
+                .salePrice(18000)
+                .quantity(100)
+                .status(BookStatus.AVAILABLE)
+                .isPackable(true)
+                .thumbnailUrl("https://example.com/image.jpg")
+                .publisher(publisher)
+                .build();
 
         book2 = Book.builder()
-            .id(2L)
-            .isbn("1234567890124")
-            .title("예제 책 제목")
-            .contents("책 내용 요약")
-            .description("책 상세 설명")
-            .publishedAt(LocalDate.of(2024, 1, 1))
-            .originalPrice(20000)
-            .salePrice(18000)
-            .discountRate((18000 * 100) / 20000)
-            .quantity(100)
-            .status(BookStatus.AVAILABLE)
-            .isPackable(true)
-            .thumbnailUrl("https://example.com/image.jpg")
-            .publisher(publisher)
-            .build();
+                .id(2L)
+                .isbn("1234567890124")
+                .title("예제 책 제목")
+                .contents("책 내용 요약")
+                .description("책 상세 설명")
+                .publishedAt(LocalDate.of(2024, 1, 1))
+                .originalPrice(20000)
+                .salePrice(18000)
+                .quantity(100)
+                .status(BookStatus.AVAILABLE)
+                .isPackable(true)
+                .thumbnailUrl("https://example.com/image.jpg")
+                .publisher(publisher)
+                .build();
 
         cartRequest = new CartRequest(user.getId(), book1.getId(), 100);
         cartResponse = new CartResponse(
-            1L,
-            user.getId(),
-            book1.getId(),
-            book1.getTitle(),
-            book1.getOriginalPrice(),
-            book1.getSalePrice(),
-            book1.getDiscountRate(),
-            book1.getThumbnailUrl(),
-            100
+                1L,
+                user.getId(),
+                book1.getId(),
+                book1.getTitle(),
+                book1.getOriginalPrice(),
+                book1.getSalePrice(),
+                book1.getDiscountRate(),
+                book1.getThumbnailUrl(),
+                100
         );
     }
 
@@ -122,10 +122,10 @@ class CartControllerTest {
         Mockito.when(cartService.addCartItem(any(CartRequest.class))).thenReturn(cartResponse);
 
         mockMvc.perform(post("/carts")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(cartRequest)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.quantity").value(100));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cartRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.quantity").value(100));
     }
 
     @Test
@@ -134,10 +134,10 @@ class CartControllerTest {
         Mockito.when(cartService.updateCartQuantity(anyLong(), any(CartUpdateRequest.class))).thenReturn(cartResponse);
 
         mockMvc.perform(put("/carts/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new CartUpdateRequest(100))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.quantity").value(100));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CartUpdateRequest(100))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quantity").value(100));
     }
 
     @Test
@@ -148,21 +148,21 @@ class CartControllerTest {
         Mockito.when(cartService.getCartItemsByUserId(user.getId())).thenReturn(cartResponses);
 
         mockMvc.perform(get("/carts/users/{userId}", user.getId()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data").isArray());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
     }
 
     @Test
     @DisplayName("장바구니 전체 삭제")
     void deleteCarts() throws Exception {
         mockMvc.perform(delete("/carts/users/1"))
-            .andExpect(status().isOk());
+                .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("장바구니 선택 삭제")
     void deleteCart() throws Exception {
         mockMvc.perform(delete("/carts/1"))
-            .andExpect(status().isOk());
+                .andExpect(status().isOk());
     }
 }
