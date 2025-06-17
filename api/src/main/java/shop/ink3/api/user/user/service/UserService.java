@@ -3,15 +3,12 @@ package shop.ink3.api.user.user.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.common.exception.DormantException;
 import shop.ink3.api.user.common.exception.InvalidPasswordException;
@@ -172,6 +169,11 @@ public class UserService {
                 .build();
         socialRepository.save(social);
 
+        try {
+            pointPolicyService.assignSignupPoint(user.getId());
+        } catch (Exception e) {
+            log.warn("신규 회원 포인트 적립 실패: {}", e.getMessage());
+        }
         return UserResponse.from(user);
     }
 
