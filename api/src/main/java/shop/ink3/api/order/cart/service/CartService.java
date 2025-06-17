@@ -10,6 +10,8 @@ import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import lombok.extern.slf4j.Slf4j;
 import shop.ink3.api.book.book.entity.Book;
 import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
@@ -27,6 +29,7 @@ import shop.ink3.api.user.user.entity.User;
 import shop.ink3.api.user.user.exception.UserNotFoundException;
 import shop.ink3.api.user.user.repository.UserRepository;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -80,6 +83,7 @@ public class CartService {
         return response;
     }
 
+    @Transactional(readOnly = true)
     public List<CartResponse> getCartItemsByUserId(Long userId) {
         List<Cart> carts = cartRepository.findByUserId(userId);
         return carts.stream()
@@ -90,6 +94,7 @@ public class CartService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<CartCouponResponse> getCartItemsWithCoupons(Long userId) {
         List<Cart> carts = cartRepository.findByUserId(userId);
         return carts.stream()
@@ -113,10 +118,34 @@ public class CartService {
             .toList();
     }
 
+    // @Transactional(readOnly = true)
+    // public List<CartResponse> getCartItems(Long userId) {
+    //     List<Cart> carts = cartRepository.findByUserId(userId);
+    //     return carts.stream().map(CartResponse::from).toList();
+    // }
+
     @Transactional(readOnly = true)
     public List<CartResponse> getCartItems(Long userId) {
+        String key = CART_KEY_PREFIX + userId;
+        HashOperations<String, String, CartResponse> ops = hashOps();
+
+        if (redisTemplate.hasKey(key)) {
+            log.info("[CACHE-HIT] userId={}", userId);
+            return ops.entries(key).values().stream().toList();
+        }
+
+        log.info("[CACHE-MISS] userId={}", userId);
+
         List<Cart> carts = cartRepository.findByUserId(userId);
-        return carts.stream().map(CartResponse::from).toList();
+        List<CartResponse> responses = carts.stream()
+            .map(CartResponse::from)
+            .toList();
+
+        for (int i = 0; i < carts.size(); i++) {
+            cacheCart(carts.get(i), responses.get(i));
+        }
+
+        return responses;
     }
 
     public void deleteCartItems(Long userId) {
