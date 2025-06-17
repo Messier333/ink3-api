@@ -49,14 +49,17 @@ public class PointPolicyService {
     }
 
     public PointPolicyResponse createPointPolicy(PointPolicyCreateRequest request) {
-        PointPolicy pointPolicy = pointPolicyRepository.save(new PointPolicy(
+        PointPolicy pointPolicy = new PointPolicy(
                 request.name(),
                 request.joinPoint(),
                 request.reviewPoint(),
                 request.imageReviewPoint(),
                 request.defaultRate()
-        ));
-        return PointPolicyResponse.from(pointPolicy);
+        );
+        if (!pointPolicyRepository.existsByIsActive(true)) {
+            pointPolicy.activate();
+        }
+        return PointPolicyResponse.from(pointPolicyRepository.save(pointPolicy));
     }
 
     public PointPolicyResponse updatePointPolicy(long pointPolicyId, PointPolicyUpdateRequest request) {

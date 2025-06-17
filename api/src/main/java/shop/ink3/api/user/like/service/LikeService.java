@@ -1,5 +1,6 @@
 package shop.ink3.api.user.like.service;
 
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import shop.ink3.api.book.book.exception.BookNotFoundException;
 import shop.ink3.api.book.book.repository.BookRepository;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.like.dto.LikeCreateRequest;
+import shop.ink3.api.user.like.dto.LikeExistResponse;
 import shop.ink3.api.user.like.dto.LikeResponse;
 import shop.ink3.api.user.like.entity.Like;
 import shop.ink3.api.user.like.exception.LikeAlreadyExistsException;
@@ -34,6 +36,12 @@ public class LikeService {
         }
         Page<Like> likes = likeRepository.findAllByUserId(userId, pageable);
         return PageResponse.from(likes.map(like -> LikeResponse.from(userId, like)));
+    }
+
+    @Transactional(readOnly = true)
+    public LikeExistResponse hasUserLikedBook(long userId, long bookId) {
+        Like like = likeRepository.findByUserIdAndBookId(userId, bookId).orElse(null);
+        return new LikeExistResponse(Objects.isNull(like) ? null : like.getId());
     }
 
     public LikeResponse createLike(long userId, LikeCreateRequest request) {

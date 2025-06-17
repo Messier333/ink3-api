@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import shop.ink3.api.common.dto.CommonResponse;
 import shop.ink3.api.common.dto.PageResponse;
 import shop.ink3.api.user.like.dto.LikeCreateRequest;
+import shop.ink3.api.user.like.dto.LikeExistResponse;
 import shop.ink3.api.user.like.dto.LikeResponse;
 import shop.ink3.api.user.like.service.LikeService;
 
@@ -31,6 +32,14 @@ public class MeLikeController {
             Pageable pageable
     ) {
         return ResponseEntity.ok(CommonResponse.success(likeService.getLikes(userId, pageable)));
+    }
+
+    @GetMapping("/books/{bookId}")
+    public ResponseEntity<CommonResponse<LikeExistResponse>> checkLiked(
+            @RequestHeader("X-User-Id") long userId,
+            @PathVariable long bookId
+    ) {
+        return ResponseEntity.ok(CommonResponse.success(likeService.hasUserLikedBook(userId, bookId)));
     }
 
     @PostMapping
