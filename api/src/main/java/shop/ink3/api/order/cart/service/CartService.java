@@ -65,7 +65,7 @@ public class CartService {
                     .build();
         }
         Cart savedCart = cartRepository.save(cart);
-        CartResponse response = CartResponse.from(savedCart);
+        CartResponse response = CartResponse.from(savedCart, getThumbnailUrl(savedCart.getBook()));
         cacheCart(savedCart, response);
 
         return response;
@@ -77,7 +77,7 @@ public class CartService {
         cart.updateQuantity(request.quantity());
         cartRepository.save(cart);
 
-        CartResponse response = CartResponse.from(cart);
+        CartResponse response = CartResponse.from(cart, getThumbnailUrl(cart.getBook()));
         cacheCart(cart, response);
 
         return response;
@@ -118,43 +118,43 @@ public class CartService {
             .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<CartResponse> getCartItems(Long userId) {
-        List<Cart> carts = cartRepository.findByUserId(userId);
-        return carts.stream()
-            .map(cart -> {
-                String presignedUrl = getThumbnailUrl(cart.getBook());
-                return CartResponse.from(cart, presignedUrl);
-            })
-            .toList();
-    }
-
     // @Transactional(readOnly = true)
     // public List<CartResponse> getCartItems(Long userId) {
-    //     String key = CART_KEY_PREFIX + userId;
-    //     HashOperations<String, String, CartResponse> ops = hashOps();
-    //
-    //     if (redisTemplate.hasKey(key)) {
-    //         log.info("[CACHE-HIT] userId={}", userId);
-    //         return ops.entries(key).values().stream().toList();
-    //     }
-    //
-    //     log.info("[CACHE-MISS] userId={}", userId);
-    //
     //     List<Cart> carts = cartRepository.findByUserId(userId);
-    //     List<CartResponse> responses = carts.stream()
+    //     return carts.stream()
     //         .map(cart -> {
     //             String presignedUrl = getThumbnailUrl(cart.getBook());
     //             return CartResponse.from(cart, presignedUrl);
     //         })
     //         .toList();
-    //
-    //     for (int i = 0; i < carts.size(); i++) {
-    //         cacheCart(carts.get(i), responses.get(i));
-    //     }
-    //
-    //     return responses;
     // }
+
+    @Transactional(readOnly = true)
+    public List<CartResponse> getCartItems(Long userId) {
+        String key = CART_KEY_PREFIX + userId;
+        HashOperations<String, String, CartResponse> ops = hashOps();
+
+        if (redisTemplate.hasKey(key)) {
+            log.info("[CACHE-HIT] userId={}", userId);
+            return ops.entries(key).values().stream().toList();
+        }
+
+        log.info("[CACHE-MISS] userId={}", userId);
+
+        List<Cart> carts = cartRepository.findByUserId(userId);
+        List<CartResponse> responses = carts.stream()
+            .map(cart -> {
+                String presignedUrl = getThumbnailUrl(cart.getBook());
+                return CartResponse.from(cart, presignedUrl);
+            })
+            .toList();
+
+        for (int i = 0; i < carts.size(); i++) {
+            cacheCart(carts.get(i), responses.get(i));
+        }
+
+        return responses;
+    }
 
     public void deleteCartItems(Long userId) {
         if (!userRepository.existsById(userId)) {
