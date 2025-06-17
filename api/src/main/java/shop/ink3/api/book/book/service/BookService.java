@@ -8,7 +8,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -98,7 +97,6 @@ public class BookService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "books:best-sellers", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
     public PageResponse<BookPreviewResponse> getBestSellerBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestSellerBooks = bookRepository.findSortedBestSellerBooks(sortType, pageable);
         Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestSellerBooks);
@@ -106,15 +104,14 @@ public class BookService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "books:new", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
     public PageResponse<BookPreviewResponse> getAllNewBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestRecommendedBooks = bookRepository.findSortedNewBooks(sortType, pageable);
         Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestRecommendedBooks);
-        return PageResponse.from(response);
+        PageResponse<BookPreviewResponse> result = PageResponse.from(response);
+        return result;
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "books:recommended", key = "#sortType.name()", condition = "#pageable.pageNumber == 0")
     public PageResponse<BookPreviewResponse> getAllRecommendedBooks(SortType sortType, Pageable pageable) {
         Page<Book> bestRecommendedBooks = bookRepository.findSortedRecommendedBooks(sortType, pageable);
         Page<BookPreviewResponse> response = mapToBookPreviewResponse(bestRecommendedBooks);
